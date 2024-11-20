@@ -4,30 +4,24 @@ package migrate
 import (
 	"fmt"
 
-	gconfig "github.com/pilinux/gorest/config"
-	gdatabase "github.com/pilinux/gorest/database"
-	gmodel "github.com/pilinux/gorest/database/model"
-
+	"github.com/pilinux/gorest/config"
+	"github.com/pilinux/gorest/database"
 	"github.com/pilinux/gorest/database/model"
 )
 
 // Load all the models
-type auth gmodel.Auth
-type twoFA gmodel.TwoFA
-type user model.User
-type post model.Post
-type hobby model.Hobby
-type userHobby model.UserHobby
+type auth model.Auth
+type twoFA model.TwoFA
+type twoFABackup model.TwoFABackup
+type tempEmail model.TempEmail
 
 // DropAllTables - careful! It will drop all the tables!
 func DropAllTables() error {
-	db := gdatabase.GetDB()
+	db := database.GetDB()
 
 	if err := db.Migrator().DropTable(
-		&userHobby{},
-		&hobby{},
-		&post{},
-		&user{},
+		&tempEmail{},
+		&twoFABackup{},
 		&twoFA{},
 		&auth{},
 	); err != nil {
@@ -39,10 +33,11 @@ func DropAllTables() error {
 }
 
 // StartMigration - automatically migrate all the tables
+//
 // - Only create tables with missing columns and missing indexes
 // - Will not change/delete any existing columns and their types
-func StartMigration(configure gconfig.Configuration) error {
-	db := gdatabase.GetDB()
+func StartMigration(configure config.Configuration) error {
+	db := database.GetDB()
 	configureDB := configure.Database.RDBMS
 	driver := configureDB.Env.Driver
 
@@ -51,9 +46,8 @@ func StartMigration(configure gconfig.Configuration) error {
 		if err := db.Set("gorm:table_options", "ENGINE=InnoDB").AutoMigrate(
 			&auth{},
 			&twoFA{},
-			&user{},
-			&post{},
-			&hobby{},
+			&twoFABackup{},
+			&tempEmail{},
 		); err != nil {
 			return err
 		}
@@ -65,24 +59,12 @@ func StartMigration(configure gconfig.Configuration) error {
 	if err := db.AutoMigrate(
 		&auth{},
 		&twoFA{},
-		&user{},
-		&post{},
-		&hobby{},
+		&twoFABackup{},
+		&tempEmail{},
 	); err != nil {
 		return err
 	}
 
 	fmt.Println("new tables are  migrated successfully!")
-	return nil
-}
-
-// SetPkFk - manually set foreign key for MySQL and PostgreSQL
-func SetPkFk() error {
-	db := gdatabase.GetDB()
-
-	if err := db.Migrator().CreateConstraint(&user{}, "Posts"); err != nil {
-		return err
-	}
-
 	return nil
 }

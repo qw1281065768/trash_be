@@ -5,13 +5,19 @@ package config
 
 import (
 	"crypto"
+	"crypto/sha256"
+	"errors"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/joho/godotenv"
+	"golang.org/x/crypto/sha3"
+
 	"github.com/pilinux/gorest/lib"
 	"github.com/pilinux/gorest/lib/middleware"
 )
@@ -19,8 +25,12 @@ import (
 // Activated - "yes" keyword to activate a service
 const Activated string = "yes"
 
+// PrefixJtiBlacklist - to manage JWT blacklist in Redis database
+const PrefixJtiBlacklist string = "gorest-blacklist-jti:"
+
 // Configuration - server and db configuration variables
 type Configuration struct {
+	Version    string
 	Database   DatabaseConfig
 	EmailConf  EmailConfig
 	Logger     LoggerConfig
@@ -39,7 +49,15 @@ func Env() error {
 
 // Config - load all the configurations
 func Config() (err error) {
+	// load environment variables
+	err = Env()
+	if err != nil {
+		return
+	}
+
 	var configuration Configuration
+
+	configuration.Version = strings.TrimSpace(os.Getenv("RELEASE_VERSION_OR_COMMIT_NUMBER"))
 
 	configuration.Database, err = database()
 	if err != nil {
@@ -49,18 +67,14 @@ func Config() (err error) {
 	if err != nil {
 		return
 	}
-	configuration.Logger, err = logger()
-	if err != nil {
-		return
-	}
+	configuration.Logger = logger()
+
 	configuration.Security, err = security()
 	if err != nil {
 		return
 	}
-	configuration.Server, err = server()
-	if err != nil {
-		return
-	}
+	configuration.Server = server()
+
 	configuration.ViewConfig, err = view()
 	if err != nil {
 		return
@@ -78,14 +92,8 @@ func GetConfig() *Configuration {
 
 // database - all DB variables
 func database() (databaseConfig DatabaseConfig, err error) {
-	// Load environment variables
-	err = Env()
-	if err != nil {
-		return
-	}
-
 	// RDBMS
-	activateRDBMS := strings.TrimSpace(os.Getenv("ACTIVATE_RDBMS"))
+	activateRDBMS := strings.ToLower(strings.TrimSpace(os.Getenv("ACTIVATE_RDBMS")))
 	if activateRDBMS == Activated {
 		dbRDBMS, errThis := databaseRDBMS()
 		if errThis != nil {
@@ -97,7 +105,7 @@ func database() (databaseConfig DatabaseConfig, err error) {
 	databaseConfig.RDBMS.Activate = activateRDBMS
 
 	// REDIS
-	activateRedis := strings.TrimSpace(os.Getenv("ACTIVATE_REDIS"))
+	activateRedis := strings.ToLower(strings.TrimSpace(os.Getenv("ACTIVATE_REDIS")))
 	if activateRedis == Activated {
 		dbRedis, errThis := databaseRedis()
 		if errThis != nil {
@@ -109,7 +117,7 @@ func database() (databaseConfig DatabaseConfig, err error) {
 	databaseConfig.REDIS.Activate = activateRedis
 
 	// MongoDB
-	activateMongo := strings.TrimSpace(os.Getenv("ACTIVATE_MONGO"))
+	activateMongo := strings.ToLower(strings.TrimSpace(os.Getenv("ACTIVATE_MONGO")))
 	if activateMongo == Activated {
 		dbMongo, errThis := databaseMongo()
 		if errThis != nil {
@@ -125,14 +133,8 @@ func database() (databaseConfig DatabaseConfig, err error) {
 
 // databaseRDBMS - all RDBMS variables
 func databaseRDBMS() (databaseConfig DatabaseConfig, err error) {
-	// Load environment variables
-	err = Env()
-	if err != nil {
-		return
-	}
-
 	// Env
-	databaseConfig.RDBMS.Env.Driver = strings.TrimSpace(os.Getenv("DBDRIVER"))
+	databaseConfig.RDBMS.Env.Driver = strings.ToLower(strings.TrimSpace(os.Getenv("DBDRIVER")))
 	databaseConfig.RDBMS.Env.Host = strings.TrimSpace(os.Getenv("DBHOST"))
 	databaseConfig.RDBMS.Env.Port = strings.TrimSpace(os.Getenv("DBPORT"))
 	databaseConfig.RDBMS.Env.TimeZone = strings.TrimSpace(os.Getenv("DBTIMEZONE"))
@@ -176,12 +178,6 @@ func databaseRDBMS() (databaseConfig DatabaseConfig, err error) {
 
 // databaseRedis - all REDIS DB variables
 func databaseRedis() (databaseConfig DatabaseConfig, err error) {
-	// Load environment variables
-	err = Env()
-	if err != nil {
-		return
-	}
-
 	// REDIS
 	poolSize, errThis := strconv.Atoi(strings.TrimSpace(os.Getenv("POOLSIZE")))
 	if errThis != nil {
@@ -204,12 +200,6 @@ func databaseRedis() (databaseConfig DatabaseConfig, err error) {
 
 // databaseMongo - all MongoDB variables
 func databaseMongo() (databaseConfig DatabaseConfig, err error) {
-	// Load environment variables
-	err = Env()
-	if err != nil {
-		return
-	}
-
 	// MongoDB
 	poolSize, errThis := strconv.ParseUint(strings.TrimSpace(os.Getenv("MONGO_POOLSIZE")), 10, 64)
 	if errThis != nil {
@@ -233,21 +223,15 @@ func databaseMongo() (databaseConfig DatabaseConfig, err error) {
 
 // email - config for using external email services
 func email() (emailConfig EmailConfig, err error) {
-	// Load environment variables
-	err = Env()
-	if err != nil {
-		return
-	}
-
-	emailConfig.Activate = strings.TrimSpace(os.Getenv("ACTIVATE_EMAIL_SERVICE"))
+	emailConfig.Activate = strings.ToLower(strings.TrimSpace(os.Getenv("ACTIVATE_EMAIL_SERVICE")))
 	if emailConfig.Activate == Activated {
-		emailConfig.Provider = strings.TrimSpace(os.Getenv("EMAIL_SERVICE_PROVIDER"))
+		emailConfig.Provider = strings.ToLower(strings.TrimSpace(os.Getenv("EMAIL_SERVICE_PROVIDER")))
 		emailConfig.APIToken = strings.TrimSpace(os.Getenv("EMAIL_API_TOKEN"))
 		emailConfig.AddrFrom = strings.TrimSpace(os.Getenv("EMAIL_FROM"))
 
 		emailConfig.TrackOpens = false
 		trackOpens := strings.TrimSpace(os.Getenv("EMAIL_TRACK_OPENS"))
-		if trackOpens == "yes" {
+		if trackOpens == Activated {
 			emailConfig.TrackOpens = true
 		}
 
@@ -262,13 +246,28 @@ func email() (emailConfig EmailConfig, err error) {
 		if err != nil {
 			return
 		}
-		emailConfig.EmailVerificationCodeLength, err = strconv.ParseUint(strings.TrimSpace(os.Getenv("EMAIL_VERIFY_CODE_LENGTH")), 10, 32)
+		emailConfig.EmailUpdateVerifyTemplateID, err = strconv.ParseInt(strings.TrimSpace(os.Getenv("EMAIL_UPDATE_VERIFY_TEMPLATE_ID")), 10, 64)
 		if err != nil {
 			return
 		}
-		emailConfig.PasswordRecoverCodeLength, err = strconv.ParseUint(strings.TrimSpace(os.Getenv("EMAIL_PASS_RECOVER_CODE_LENGTH")), 10, 32)
-		if err != nil {
-			return
+
+		useUUIDv4EmailVerificationCode := strings.ToLower(strings.TrimSpace(os.Getenv("EMAIL_VERIFY_USE_UUIDv4")))
+		if useUUIDv4EmailVerificationCode == Activated {
+			emailConfig.EmailVerificationCodeUUIDv4 = true
+		} else {
+			emailConfig.EmailVerificationCodeLength, err = strconv.ParseUint(strings.TrimSpace(os.Getenv("EMAIL_VERIFY_CODE_LENGTH")), 10, 32)
+			if err != nil {
+				return
+			}
+		}
+		useUUIDv4PasswordRecoverCode := strings.ToLower(strings.TrimSpace(os.Getenv("EMAIL_PASS_RECOVER_USE_UUIDv4")))
+		if useUUIDv4PasswordRecoverCode == Activated {
+			emailConfig.PasswordRecoverCodeUUIDv4 = true
+		} else {
+			emailConfig.PasswordRecoverCodeLength, err = strconv.ParseUint(strings.TrimSpace(os.Getenv("EMAIL_PASS_RECOVER_CODE_LENGTH")), 10, 32)
+			if err != nil {
+				return
+			}
 		}
 		emailConfig.EmailVerificationTag = strings.TrimSpace(os.Getenv("EMAIL_VERIFY_TAG"))
 		emailConfig.PasswordRecoverTag = strings.TrimSpace(os.Getenv("EMAIL_PASS_RECOVER_TAG"))
@@ -281,24 +280,18 @@ func email() (emailConfig EmailConfig, err error) {
 		if err != nil {
 			return
 		}
-
-		// smtp
 	}
 
 	return
 }
 
 // logger - config for sentry.io
-func logger() (loggerConfig LoggerConfig, err error) {
-	// Load environment variables
-	err = Env()
-	if err != nil {
-		return
-	}
-
-	loggerConfig.Activate = strings.TrimSpace(os.Getenv("ACTIVATE_SENTRY"))
+func logger() (loggerConfig LoggerConfig) {
+	loggerConfig.Activate = strings.ToLower(strings.TrimSpace(os.Getenv("ACTIVATE_SENTRY")))
 	if loggerConfig.Activate == Activated {
 		loggerConfig.SentryDsn = strings.TrimSpace(os.Getenv("SentryDSN"))
+		loggerConfig.PerformanceTracing = strings.ToLower(strings.TrimSpace(os.Getenv("SENTRY_ENABLE_TRACING")))
+		loggerConfig.TracesSampleRate = strings.TrimSpace(os.Getenv("SENTRY_TRACES_SAMPLE_RATE"))
 	}
 
 	return
@@ -306,29 +299,26 @@ func logger() (loggerConfig LoggerConfig, err error) {
 
 // security - configs for generating tokens and hashes
 func security() (securityConfig SecurityConfig, err error) {
-	// Load environment variables
-	err = Env()
-	if err != nil {
-		return
-	}
-
 	// Minimum password length
-	userPassMinLength, errThis := strconv.Atoi(strings.TrimSpace(os.Getenv("MIN_PASS_LENGTH")))
-	if errThis != nil {
-		err = errThis
-		return
+	minPassLength := strings.TrimSpace(os.Getenv("MIN_PASS_LENGTH"))
+	if minPassLength != "" {
+		userPassMinLength, errThis := strconv.Atoi(minPassLength)
+		if errThis != nil {
+			err = errThis
+			return
+		}
+		securityConfig.UserPassMinLength = userPassMinLength
 	}
-	securityConfig.UserPassMinLength = userPassMinLength
 
 	// Basic auth
-	securityConfig.MustBasicAuth = strings.TrimSpace(os.Getenv("ACTIVATE_BASIC_AUTH"))
+	securityConfig.MustBasicAuth = strings.ToLower(strings.TrimSpace(os.Getenv("ACTIVATE_BASIC_AUTH")))
 	if securityConfig.MustBasicAuth == Activated {
 		securityConfig.BasicAuth.Username = strings.TrimSpace(os.Getenv("USERNAME"))
 		securityConfig.BasicAuth.Password = strings.TrimSpace(os.Getenv("PASSWORD"))
 	}
 
 	// JWT
-	securityConfig.MustJWT = strings.TrimSpace(os.Getenv("ACTIVATE_JWT"))
+	securityConfig.MustJWT = strings.ToLower(strings.TrimSpace(os.Getenv("ACTIVATE_JWT")))
 	if securityConfig.MustJWT == Activated {
 		securityConfig.JWT, err = getParamsJWT()
 		if err != nil {
@@ -339,27 +329,88 @@ func security() (securityConfig SecurityConfig, err error) {
 		setParamsJWT(securityConfig.JWT)
 	}
 
+	// When user logs off, invalidate the tokens
+	securityConfig.InvalidateJWT = strings.ToLower(strings.TrimSpace(os.Getenv("INVALIDATE_JWT")))
+
+	// Cookie for authentication and authorization
+	authCookieActivate := strings.ToLower(strings.TrimSpace(os.Getenv("AUTH_COOKIE_ACTIVATE")))
+	if authCookieActivate == Activated {
+		securityConfig.AuthCookieActivate = true
+		securityConfig.AuthCookiePath = strings.TrimSpace(os.Getenv("AUTH_COOKIE_PATH"))
+		securityConfig.AuthCookieDomain = strings.TrimSpace(os.Getenv("AUTH_COOKIE_DOMAIN"))
+
+		if strings.ToLower(strings.TrimSpace(os.Getenv("AUTH_COOKIE_SECURE"))) == Activated {
+			securityConfig.AuthCookieSecure = true
+		}
+
+		if strings.ToLower(strings.TrimSpace(os.Getenv("AUTH_COOKIE_HttpOnly"))) == Activated {
+			securityConfig.AuthCookieHTTPOnly = true
+		}
+
+		authCookieSameSite := strings.ToLower(strings.TrimSpace(os.Getenv("AUTH_COOKIE_SameSite")))
+		if len(authCookieSameSite) > 0 {
+			if authCookieSameSite == "strict" {
+				securityConfig.AuthCookieSameSite = http.SameSiteStrictMode
+			}
+			if authCookieSameSite == "lax" {
+				securityConfig.AuthCookieSameSite = http.SameSiteLaxMode
+			}
+			if authCookieSameSite == "none" {
+				securityConfig.AuthCookieSameSite = http.SameSiteNoneMode
+			}
+		}
+
+		if strings.ToLower(strings.TrimSpace(os.Getenv("SERVE_JWT_AS_RESPONSE_BODY"))) != "no" {
+			securityConfig.ServeJwtAsResBody = true
+		}
+	}
+
 	// Hashing passwords
-	securityConfig.MustHash = strings.TrimSpace(os.Getenv("ACTIVATE_HASHING"))
+	securityConfig.MustHash = strings.ToLower(strings.TrimSpace(os.Getenv("ACTIVATE_HASHING")))
 	if securityConfig.MustHash == Activated {
 		securityConfig.HashPass, err = getParamsHash()
 		if err != nil {
 			return
 		}
+		securityConfig.HashSec = strings.TrimSpace(os.Getenv("HASH_SECRET"))
+	}
+
+	// config for ChaCha20-Poly1305 encryption
+	activateCipher := strings.ToLower(strings.TrimSpace(os.Getenv("ACTIVATE_CIPHER")))
+	if activateCipher == Activated {
+		securityConfig.MustCipher = true
+
+		cipherKey := strings.TrimSpace(os.Getenv("CIPHER_KEY"))
+		if cipherKey == "" {
+			err = errors.New("CIPHER_KEY is missing")
+			return
+		}
+		cipherKeyHash2 := sha256.Sum256([]byte(cipherKey)) // sha2-256
+		cipherKeyHash3 := sha3.Sum256(cipherKeyHash2[:])   // sha3-256
+		securityConfig.CipherKey = cipherKeyHash3[:]
+
+	}
+
+	// config for blake2b hashing
+	blake2bSec := strings.TrimSpace(os.Getenv("BLAKE2B_SECRET"))
+	if blake2bSec == "" {
+		securityConfig.Blake2bSec = nil
+	} else {
+		securityConfig.Blake2bSec = []byte(blake2bSec)
 	}
 
 	// Email verification and password recovery
 	securityConfig.VerifyEmail = false
 	securityConfig.RecoverPass = false
-	if strings.TrimSpace(os.Getenv("VERIFY_EMAIL")) == "yes" {
+	if strings.ToLower(strings.TrimSpace(os.Getenv("VERIFY_EMAIL"))) == Activated {
 		securityConfig.VerifyEmail = true
 	}
-	if strings.TrimSpace(os.Getenv("RECOVER_PASSWORD")) == "yes" {
+	if strings.ToLower(strings.TrimSpace(os.Getenv("RECOVER_PASSWORD"))) == Activated {
 		securityConfig.RecoverPass = true
 	}
 
 	// Two-factor authentication
-	securityConfig.Must2FA = strings.TrimSpace(os.Getenv("ACTIVATE_2FA"))
+	securityConfig.Must2FA = strings.ToLower(strings.TrimSpace(os.Getenv("ACTIVATE_2FA")))
 	if securityConfig.Must2FA == Activated {
 		securityConfig.TwoFA.Issuer = strings.TrimSpace(os.Getenv("TWO_FA_ISSUER"))
 
@@ -401,17 +452,24 @@ func security() (securityConfig SecurityConfig, err error) {
 				}
 			}
 		}
+
+		// false: sha2_256()
+		// true: blake2b(sha2_256())
+		doubleHashTwoFA := strings.ToLower(strings.TrimSpace(os.Getenv("TWO_FA_DOUBLE_HASH")))
+		if doubleHashTwoFA == Activated {
+			securityConfig.TwoFA.DoubleHash = true
+		}
 	}
 
 	// App firewall
-	securityConfig.MustFW = strings.TrimSpace(os.Getenv("ACTIVATE_FIREWALL"))
+	securityConfig.MustFW = strings.ToLower(strings.TrimSpace(os.Getenv("ACTIVATE_FIREWALL")))
 	if securityConfig.MustFW == Activated {
 		securityConfig.Firewall.ListType = strings.TrimSpace(os.Getenv("LISTTYPE"))
 		securityConfig.Firewall.IP = strings.TrimSpace(os.Getenv("IP"))
 	}
 
 	// CORS
-	securityConfig.MustCORS = strings.TrimSpace(os.Getenv("ACTIVATE_CORS"))
+	securityConfig.MustCORS = strings.ToLower(strings.TrimSpace(os.Getenv("ACTIVATE_CORS")))
 	if securityConfig.MustCORS == Activated {
 		cp := middleware.CORSPolicy{}
 
@@ -533,6 +591,12 @@ func security() (securityConfig SecurityConfig, err error) {
 		}
 	}
 
+	// Validate origin of the request
+	securityConfig.CheckOrigin = strings.ToLower(strings.TrimSpace(os.Getenv("ACTIVATE_ORIGIN_VALIDATION")))
+
+	// IP-based rate limiter
+	securityConfig.RateLimit = strings.ToUpper(strings.TrimSpace(os.Getenv("RATE_LIMIT")))
+
 	// Important for getting real client IP
 	securityConfig.TrustedPlatform = strings.TrimSpace(os.Getenv("TRUSTED_PLATFORM"))
 
@@ -540,28 +604,17 @@ func security() (securityConfig SecurityConfig, err error) {
 }
 
 // server - port and env
-func server() (serverConfig ServerConfig, err error) {
-	// Load environment variables
-	err = Env()
-	if err != nil {
-		return
-	}
-
+func server() (serverConfig ServerConfig) {
+	serverConfig.ServerHost = strings.TrimSpace(os.Getenv("APP_HOST"))
 	serverConfig.ServerPort = strings.TrimSpace(os.Getenv("APP_PORT"))
-	serverConfig.ServerEnv = strings.TrimSpace(os.Getenv("APP_ENV"))
+	serverConfig.ServerEnv = strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
 
 	return
 }
 
 // view - HTML renderer
 func view() (viewConfig ViewConfig, err error) {
-	// Load environment variables
-	err = Env()
-	if err != nil {
-		return
-	}
-
-	viewConfig.Activate = strings.TrimSpace(os.Getenv("ACTIVATE_VIEW"))
+	viewConfig.Activate = strings.ToLower(strings.TrimSpace(os.Getenv("ACTIVATE_VIEW")))
 	if viewConfig.Activate == Activated {
 		viewConfig.Directory = strings.TrimRight(strings.TrimSpace(os.Getenv("TEMPLATE_DIR")), "/")
 
@@ -583,11 +636,27 @@ func view() (viewConfig ViewConfig, err error) {
 
 // getParamsJWT - read parameters from env
 func getParamsJWT() (params middleware.JWTParameters, err error) {
-	err = Env()
-	if err != nil {
+	alg := strings.TrimSpace(os.Getenv("JWT_ALG"))
+	if alg == "" {
+		alg = "HS256" // default algorithm
+	}
+	// list of accepted algorithms
+	// HS256: HMAC-SHA256
+	// HS384: HMAC-SHA384
+	// HS512: HMAC-SHA512
+	// ES256: ECDSA Signature with SHA-256
+	// ES384: ECDSA Signature with SHA-384
+	// ES512: ECDSA Signature with SHA-512
+	// RS256: RSA Signature with SHA-256
+	// RS384: RSA Signature with SHA-384
+	// RS512: RSA Signature with SHA-512
+	if alg != "HS256" && alg != "HS384" && alg != "HS512" &&
+		alg != "ES256" && alg != "ES384" && alg != "ES512" &&
+		alg != "RS256" && alg != "RS384" && alg != "RS512" {
+		err = errors.New("unsupported algorithm for JWT")
 		return
 	}
-
+	params.Algorithm = alg
 	params.AccessKey = []byte(strings.TrimSpace(os.Getenv("ACCESS_KEY")))
 	params.AccessKeyTTL, err = strconv.Atoi(strings.TrimSpace(os.Getenv("ACCESS_KEY_TTL")))
 	if err != nil {
@@ -598,6 +667,67 @@ func getParamsJWT() (params middleware.JWTParameters, err error) {
 	if err != nil {
 		return
 	}
+
+	privateKeyFile := strings.TrimSpace(os.Getenv("PRIV_KEY_FILE_PATH"))
+	if privateKeyFile != "" {
+		// load the private key
+		privateKeyBytes, errThis := os.ReadFile(privateKeyFile)
+		if errThis != nil {
+			err = errThis
+			return
+		}
+
+		// ECDSA
+		if alg == "ES256" || alg == "ES384" || alg == "ES512" {
+			privateKey, errThis := jwt.ParseECPrivateKeyFromPEM(privateKeyBytes)
+			if errThis != nil {
+				err = errThis
+				return
+			}
+			params.PrivKeyECDSA = privateKey
+		}
+
+		// RSA
+		if alg == "RS256" || alg == "RS384" || alg == "RS512" {
+			privateKey, errThis := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
+			if errThis != nil {
+				err = errThis
+				return
+			}
+			params.PrivKeyRSA = privateKey
+		}
+	}
+
+	publicKeyFile := strings.TrimSpace(os.Getenv("PUB_KEY_FILE_PATH"))
+	if publicKeyFile != "" {
+		// load the public key
+		publicKeyBytes, errThis := os.ReadFile(publicKeyFile)
+		if errThis != nil {
+			err = errThis
+			return
+		}
+
+		// ECDSA
+		if alg == "ES256" || alg == "ES384" || alg == "ES512" {
+			publicKey, errThis := jwt.ParseECPublicKeyFromPEM(publicKeyBytes)
+			if errThis != nil {
+				err = errThis
+				return
+			}
+			params.PubKeyECDSA = publicKey
+		}
+
+		// RSA
+		if alg == "RS256" || alg == "RS384" || alg == "RS512" {
+			publicKey, errThis := jwt.ParseRSAPublicKeyFromPEM(publicKeyBytes)
+			if errThis != nil {
+				err = errThis
+				return
+			}
+			params.PubKeyRSA = publicKey
+		}
+	}
+
 	params.Audience = strings.TrimSpace(os.Getenv("AUDIENCE"))
 	params.Issuer = strings.TrimSpace(os.Getenv("ISSUER"))
 	params.AccNbf, err = strconv.Atoi(strings.TrimSpace(os.Getenv("NOT_BEFORE_ACC")))
@@ -615,10 +745,16 @@ func getParamsJWT() (params middleware.JWTParameters, err error) {
 
 // setParamsJWT - set parameters for JWT
 func setParamsJWT(c middleware.JWTParameters) {
+	middleware.JWTParams.Algorithm = c.Algorithm
 	middleware.JWTParams.AccessKey = c.AccessKey
 	middleware.JWTParams.AccessKeyTTL = c.AccessKeyTTL
 	middleware.JWTParams.RefreshKey = c.RefreshKey
 	middleware.JWTParams.RefreshKeyTTL = c.RefreshKeyTTL
+	middleware.JWTParams.PrivKeyECDSA = c.PrivKeyECDSA
+	middleware.JWTParams.PubKeyECDSA = c.PubKeyECDSA
+	middleware.JWTParams.PrivKeyRSA = c.PrivKeyRSA
+	middleware.JWTParams.PubKeyRSA = c.PubKeyRSA
+
 	middleware.JWTParams.Audience = c.Audience
 	middleware.JWTParams.Issuer = c.Issuer
 	middleware.JWTParams.AccNbf = c.AccNbf
@@ -628,11 +764,6 @@ func setParamsJWT(c middleware.JWTParameters) {
 
 // getParamsHash - read parameters from env
 func getParamsHash() (params lib.HashPassConfig, err error) {
-	err = Env()
-	if err != nil {
-		return
-	}
-
 	hashPassMemory64, errThis := strconv.ParseUint((strings.TrimSpace(os.Getenv("HASHPASSMEMORY"))), 10, 32)
 	if errThis != nil {
 		err = errThis

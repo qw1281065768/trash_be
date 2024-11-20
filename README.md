@@ -9,7 +9,7 @@
 [![Go Reference][14]][15]
 [![Go Report Card](https://goreportcard.com/badge/github.com/pilinux/gorest)][01]
 [![CodeFactor](https://www.codefactor.io/repository/github/pilinux/gorest/badge)][06]
-[![codebeat badge](https://codebeat.co/badges/3e3573cc-2e9d-48bc-a8c5-4f054bfdfcf7)][03]
+[![codebeat badge](https://codebeat.co/badges/12c01a53-4745-4f90-ad2b-a95c94e4b432)][03]
 [![MIT license](https://img.shields.io/badge/license-MIT-brightgreen.svg)][13]
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)][62]
 
@@ -31,11 +31,13 @@ under the [MIT license][13] and is free for any personal or commercial project.
 
 Version `1.6.x` contains breaking changes!
 
-_Note:_ For version `1.4.5`: [v1.4.5](https://github.com/pilinux/gorest/tree/v1.4.5)
+_Note:_ For version `1.4.5` (obsolete): [v1.4.5](https://github.com/pilinux/gorest/tree/v1.4.5)
+
+For all projects, it is recommended to use version `1.6.x` or higher.
 
 ## Requirement
 
-`Go 1.19+`
+`Go 1.20+`
 
 ## Supported databases
 
@@ -50,13 +52,15 @@ _Note:_ gorest uses [GORM][21] as its ORM
 ## Features
 
 - [x] built on top of [Gin][12]
+- [x] option to enable encryption at rest for user private information
 - [x] use the supported databases without writing any extra configuration files
 - [x] environment variables using [GoDotEnv][51]
 - [x] CORS policy
 - [x] basic auth
 - [x] two-factor authentication
 - [x] JWT using [golang-jwt/jwt][16]
-- [x] password hashing with `Argon2id`
+- [x] password hashing using `Argon2id` with optional secret (NIST 800-63B
+  recommends using a secret value of at least 112 bits)
 - [x] JSON protection from hijacking
 - [x] simple firewall (whitelist/blacklist IP)
 - [x] email validation (pattern + MX lookup)
@@ -64,7 +68,104 @@ _Note:_ gorest uses [GORM][21] as its ORM
 - [x] forgotten password recovery
 - [x] render `HTML` templates
 - [x] forward error logs and crash reports to [sentry.io][17]
+- [x] handle authentication tokens on client devices' cookies
+- [x] logout (individually enable option - delete tokens from cookies, ban active tokens)
+- [x] rate limiting (IP-based)
+- [x] option to validate origin of the request
 - [x] super easy to learn and use - lots of example codes
+
+## Supported JWT signing algorithms
+
+- [x] HS256: HMAC-SHA256
+- [x] HS384: HMAC-SHA384
+- [x] HS512: HMAC-SHA512
+- [x] ES256: ECDSA Signature with SHA-256
+- [x] ES384: ECDSA Signature with SHA-384
+- [x] ES512: ECDSA Signature with SHA-512
+- [x] RS256: RSA Signature with SHA-256
+- [x] RS384: RSA Signature with SHA-384
+- [x] RS512: RSA Signature with SHA-512
+
+Procedures to generate HS256, HS384, HS512 keys using openssl:
+
+- HS256: `openssl rand -base64 32`
+- HS384: `openssl rand -base64 48`
+- HS512: `openssl rand -base64 64`
+
+Procedures to generate public-private key pair using openssl:
+
+### ECDSA
+
+#### ES256
+
+- prime256v1: X9.62/SECG curve over a 256 bit prime field, also known as P-256 or NIST P-256
+- widely used, recommended for general-purpose cryptographic operations
+
+```bash
+openssl ecparam -name prime256v1 -genkey -noout -out private-key.pem
+openssl ec -in private-key.pem -pubout -out public-key.pem
+```
+
+#### ES384
+
+- secp384r1: NIST/SECG curve over a 384 bit prime field
+
+```bash
+openssl ecparam -name secp384r1 -genkey -noout -out private-key.pem
+openssl ec -in private-key.pem -pubout -out public-key.pem
+```
+
+#### ES512
+
+- secp521r1: NIST/SECG curve over a 521 bit prime field
+
+```bash
+openssl ecparam -name secp521r1 -genkey -noout -out private-key.pem
+openssl ec -in private-key.pem -pubout -out public-key.pem
+```
+
+### RSA
+
+#### RS256
+
+```bash
+openssl genpkey -algorithm RSA -out private-key.pem -pkeyopt rsa_keygen_bits:2048
+openssl rsa -in private-key.pem -pubout -out public-key.pem
+```
+
+#### RS384
+
+```bash
+openssl genpkey -algorithm RSA -out private-key.pem -pkeyopt rsa_keygen_bits:3072
+openssl rsa -in private-key.pem -pubout -out public-key.pem
+```
+
+#### RS512
+
+```bash
+openssl genpkey -algorithm RSA -out private-key.pem -pkeyopt rsa_keygen_bits:4096
+openssl rsa -in private-key.pem -pubout -out public-key.pem
+```
+
+## Example docker compose file
+
+```yml
+# syntax=docker/dockerfile:1
+
+version: '3.9'
+name: go
+services:
+  goapi:
+    image: golang:latest
+    container_name: goapi
+    working_dir: /app/
+    restart: unless-stopped:10s
+    command: /app/goapi
+    ports:
+      - '127.0.0.1:8000:8999'
+    volumes:
+      - ./app:/app/
+```
 
 ## Start building
 
@@ -76,7 +177,7 @@ _Tutorials:_
 
 For version `1.6.x`, please check the project in [example](example)
 
-For version `1.4.x` and `1.5.x`, [Wiki][10]
+For version `1.4.x` and `1.5.x`, [Wiki][10] (obsolete)
 
 - convention over configuration
 
@@ -102,12 +203,46 @@ _Note:_ For **MySQL** driver, please [check issue: 7][42]
 
 **Note For SQLite3:**
 
-- `DBUSER`, `DBPASS`, `DBHOST` and `DBPORT` environment variables
-  should be left unchanged.
-- `DBNAME` must contain the full path and the database file name; i.e,
+- `DBUSER`, `DBPASS`, `DBHOST` and `DBPORT` environment variables are not required.
+- `DBNAME` must contain the full or relative path of the database file name; i.e,
 
 ```env
 /user/location/database.db
+```
+
+or,
+
+```env
+./database.db
+```
+
+## Debugging with Error Codes
+
+| package | file | error code range |
+| ------- | ---- | ---------------- |
+| controller | login.go | `1011 - 1012` |
+| controller | twoFA.go | `1041 - 1044` |
+| database | dbConnect.go | `150 - 155`, `161` |
+| handler | auth.go | `1001 - 1003` |
+| handler | login.go | `1013 - 1014` |
+| handler | logout.go | `1016` |
+| handler | passwordReset.go | `1021 - 1030` |
+| handler | twoFA.go | `1051 - 1056` |
+| handler | verification.go | `1061 - 1065` |
+| service | common.go | `401 - 406` |
+| service | security.go | `501` |
+
+## Development
+
+For testing:
+
+```bash
+export TEST_ENV_URL="https://s3.nl-ams.scw.cloud/ci.config/github.action/gorest.pilinux/.env"
+export TEST_INDEX_HTML_URL="https://s3.nl-ams.scw.cloud/ci.config/github.action/gorest.pilinux/index.html"
+export TEST_KEY_FILE_LOCATION="https://s3.nl-ams.scw.cloud/ci.config/github.action/gorest.pilinux"
+export TEST_SENTRY_DSN="please_set_your_sentry_DSN_here"
+
+go test -v -cover ./...
 ```
 
 ## Contributing
@@ -120,7 +255,7 @@ Please see [this][62] document.
 
 ## License
 
-© Mahir Hasan 2019 - 2023
+© Mahir Hasan 2019 - 2024
 
 Released under the [MIT license][13]
 
@@ -141,8 +276,8 @@ Released under the [MIT license][13]
 [16]: https://github.com/golang-jwt/jwt
 [17]: https://sentry.io/
 [21]: https://gorm.io
-[41]: https://github.com/piLinux/HowtoCode/blob/master/Golang/1.Intro/Installation.md
-[42]: https://github.com/piLinux/GoREST/issues/7
+[41]: https://github.com/pilinux/HowtoCode/blob/master/Golang/1.Intro/Installation.md
+[42]: https://github.com/pilinux/gorest/issues/7
 [51]: https://github.com/joho/godotenv
 [61]: CONTRIBUTING.md
 [62]: CODE_OF_CONDUCT.md

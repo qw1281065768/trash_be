@@ -23,14 +23,16 @@ const (
 
 // Email type
 const (
-	EmailTypeVerification int = 1
-	EmailTypePassRecovery int = 2
+	EmailTypeVerifyEmailNewAcc  int = 1 // verify email of newly registered user
+	EmailTypePassRecovery       int = 2 // password recovery code
+	EmailTypeVerifyUpdatedEmail int = 3 // verify request of updating user email
 )
 
 // Redis key prefixes
 const (
-	EmailVerificationKeyPrefix string = "verify-"
-	PasswordRecoveryKeyPrefix  string = "recover-"
+	EmailVerificationKeyPrefix string = "gorest-email-verification-"
+	EmailUpdateKeyPrefix       string = "gorest-email-update-"
+	PasswordRecoveryKeyPrefix  string = "gorest-pass-recover-"
 )
 
 // Auth model - `auths` table
@@ -39,7 +41,10 @@ type Auth struct {
 	CreatedAt   time.Time      `json:"createdAt,omitempty"`
 	UpdatedAt   time.Time      `json:"updatedAt,omitempty"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
-	Email       string         `json:"email"`
+	Email       string         `gorm:"index" json:"email"`
+	EmailCipher string         `json:"-"`
+	EmailNonce  string         `json:"-"`
+	EmailHash   string         `gorm:"index" json:"-"`
 	Password    string         `json:"password"`
 	VerifyEmail int8           `json:"-"`
 }
@@ -74,7 +79,7 @@ func (v *Auth) UnmarshalJSON(b []byte) error {
 		SaltLength:  configSecurity.HashPass.SaltLength,
 		KeyLength:   configSecurity.HashPass.KeyLength,
 	}
-	pass, err := lib.HashPass(config, aux.Password)
+	pass, err := lib.HashPass(config, aux.Password, configSecurity.HashSec)
 	if err != nil {
 		return err
 	}
@@ -110,4 +115,19 @@ type AuthPayload struct {
 
 	PassNew    string `json:"passNew,omitempty"`
 	PassRepeat string `json:"passRepeat,omitempty"`
+}
+
+// TempEmail - 'temp_emails' table to hold data temporarily
+// during the process of replacing a user's email address
+// with a new one
+type TempEmail struct {
+	ID          uint64    `gorm:"primaryKey" json:"-"`
+	CreatedAt   time.Time `json:"createdAt,omitempty"`
+	UpdatedAt   time.Time `json:"updatedAt,omitempty"`
+	Email       string    `gorm:"index" json:"emailNew"`
+	Password    string    `gorm:"-" json:"password,omitempty"`
+	EmailCipher string    `json:"-"`
+	EmailNonce  string    `json:"-"`
+	EmailHash   string    `gorm:"index" json:"-"`
+	IDAuth      uint64    `gorm:"index" json:"-"`
 }

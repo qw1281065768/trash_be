@@ -2,6 +2,7 @@ package config
 
 import (
 	"crypto"
+	"net/http"
 
 	"github.com/pilinux/gorest/lib"
 	"github.com/pilinux/gorest/lib/middleware"
@@ -20,8 +21,24 @@ type SecurityConfig struct {
 	MustJWT string
 	JWT     middleware.JWTParameters
 
+	InvalidateJWT string // when user logs off, invalidate the tokens
+
+	AuthCookieActivate bool
+	AuthCookiePath     string
+	AuthCookieDomain   string
+	AuthCookieSecure   bool
+	AuthCookieHTTPOnly bool
+	AuthCookieSameSite http.SameSite
+	ServeJwtAsResBody  bool
+
 	MustHash string
 	HashPass lib.HashPassConfig
+	HashSec  string // optional secret for argon2id hashing
+
+	// data encryption at rest
+	MustCipher bool
+	CipherKey  []byte // for 256-bit ChaCha20-Poly1305
+	Blake2bSec []byte // optional secret for blake2b hashing
 
 	VerifyEmail bool
 	RecoverPass bool
@@ -35,6 +52,8 @@ type SecurityConfig struct {
 	MustCORS string
 	CORS     []middleware.CORSPolicy
 
+	CheckOrigin     string
+	RateLimit       string
 	TrustedPlatform string
 
 	Must2FA string
@@ -45,6 +64,8 @@ type SecurityConfig struct {
 
 		Status Status2FA
 		PathQR string
+
+		DoubleHash bool
 	}
 }
 

@@ -1,36 +1,26 @@
 package service
 
 import (
-	"bytes"
 	"context"
-	"crypto/tls"
+	"encoding/hex"
+	"errors"
 	"fmt"
-	"html/template"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/mediocregopher/radix/v4"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/k3a/html2text"
 	"github.com/pilinux/gorest/config"
 	"github.com/pilinux/gorest/database"
 	"github.com/pilinux/gorest/database/model"
 	"github.com/pilinux/gorest/lib"
 	"github.com/pilinux/gorest/lib/middleware"
 	"github.com/pilinux/libgo/timestring"
-	"gopkg.in/gomail.v2"
 )
-
-type EmailData struct {
-	URL       string
-	FirstName string
-	Subject   string
-}
 
 // GetClaims - get JWT custom claims
 func GetClaims(c *gin.Context) middleware.MyCustomClaims {
@@ -47,6 +37,16 @@ func GetClaims(c *gin.Context) middleware.MyCustomClaims {
 	}
 
 	return claims
+}
+
+// ValidateAuthID - check whether authID is missing
+func ValidateAuthID(authID uint64) bool {
+	if authID == 0 {
+		return false
+	}
+
+	// does it exist in the database
+	return IsAuthIDValid(authID)
 }
 
 // ValidateUserID - check whether authID or email is missing
@@ -80,39 +80,45 @@ func DelMem2FA(authID uint64) {
 }
 
 // SendEmail sends a verification/password recovery email if
+//
 // - required by the application
+//
 // - an external email service is configured
+//
 // - a redis database is configured
-func SendEmail(email string, emailType int) bool {
+//
+// {true, nil} => email delivered successfully
+//
+// {false, nil} => email delivery not required/service not configured
+//
+// {false, error} => email delivery failed
+func SendEmail(email string, emailType int, opts ...string) (bool, error) {
 	// send email if required by the application
 	appConfig := config.GetConfig()
 
 	// is external email service activated
 	if appConfig.EmailConf.Activate != config.Activated {
-		fmt.Println("email not active")
-		return false
+		return false, nil
 	}
 
 	// is verification/password recovery email required
 	doSendEmail := false
-	if appConfig.Security.VerifyEmail && emailType == model.EmailTypeVerification {
-		//fmt.Println("email type error1")
-		//fmt.Println(emailType)
+	if appConfig.Security.VerifyEmail && emailType == model.EmailTypeVerifyEmailNewAcc {
 		doSendEmail = true
 	}
 	if appConfig.Security.RecoverPass && emailType == model.EmailTypePassRecovery {
-		//fmt.Println("email type error2")
+		doSendEmail = true
+	}
+	if appConfig.Security.VerifyEmail && emailType == model.EmailTypeVerifyUpdatedEmail {
 		doSendEmail = true
 	}
 	if !doSendEmail {
-		fmt.Println("email type error3")
-		return false
+		return false, nil
 	}
 
 	// is redis database activated
 	if appConfig.Database.REDIS.Activate != config.Activated {
-		fmt.Println("redis error")
-		return false
+		return false, nil
 	}
 
 	data := struct {
@@ -122,21 +128,57 @@ func SendEmail(email string, emailType int) bool {
 	var keyTTL uint64
 	var emailTag string
 	var code uint64
+	var codeUUIDv4 string
 
 	// generate verification/password recovery code
-	if emailType == model.EmailTypeVerification {
-		code = lib.SecureRandomNumber(appConfig.EmailConf.EmailVerificationCodeLength)
-		data.key = model.EmailVerificationKeyPrefix + strconv.FormatUint(code, 10)
+	if emailType == model.EmailTypeVerifyEmailNewAcc || emailType == model.EmailTypeVerifyUpdatedEmail {
+		if emailType == model.EmailTypeVerifyEmailNewAcc {
+			data.key = model.EmailVerificationKeyPrefix
+		}
+		if emailType == model.EmailTypeVerifyUpdatedEmail {
+			data.key = model.EmailUpdateKeyPrefix
+		}
+
+		if config.IsEmailVerificationCodeUUIDv4() {
+			codeUUIDv4 = uuid.NewString()
+			data.key += codeUUIDv4
+		}
+		if !config.IsEmailVerificationCodeUUIDv4() {
+			code = lib.SecureRandomNumber(appConfig.EmailConf.EmailVerificationCodeLength)
+			data.key += strconv.FormatUint(code, 10)
+		}
 		keyTTL = appConfig.EmailConf.EmailVerifyValidityPeriod
 		emailTag = appConfig.EmailConf.EmailVerificationTag
 	}
 	if emailType == model.EmailTypePassRecovery {
-		code = lib.SecureRandomNumber(appConfig.EmailConf.PasswordRecoverCodeLength)
-		data.key = model.PasswordRecoveryKeyPrefix + strconv.FormatUint(code, 10)
+		if config.IsPasswordRecoverCodeUUIDv4() {
+			codeUUIDv4 = uuid.NewString()
+			data.key = model.PasswordRecoveryKeyPrefix + codeUUIDv4
+		}
+		if !config.IsPasswordRecoverCodeUUIDv4() {
+			code = lib.SecureRandomNumber(appConfig.EmailConf.PasswordRecoverCodeLength)
+			data.key = model.PasswordRecoveryKeyPrefix + strconv.FormatUint(code, 10)
+		}
 		keyTTL = appConfig.EmailConf.PassRecoverValidityPeriod
 		emailTag = appConfig.EmailConf.PasswordRecoverTag
 	}
 	data.value = email
+
+	// when encryption at rest is used
+	if config.IsCipher() {
+		var err error
+
+		// hash of the email in hexadecimal string format
+		value, err := CalcHash(
+			[]byte(email),
+			config.GetConfig().Security.Blake2bSec,
+		)
+		if err != nil {
+			log.WithError(err).Error("error code: 406.1")
+			return false, err
+		}
+		data.value = hex.EncodeToString(value)
+	}
 
 	// save in redis with expiry time
 	client := *database.GetRedis()
@@ -149,9 +191,11 @@ func SendEmail(email string, emailType int) bool {
 	r1 := ""
 	if err := client.Do(ctx, radix.FlatCmd(&r1, "SET", data.key, data.value)); err != nil {
 		log.WithError(err).Error("error code: 401")
+		return false, err
 	}
 	if r1 != "OK" {
 		log.Error("error code: 402")
+		return false, errors.New("failed to save in redis")
 	}
 
 	// Set expiry time
@@ -167,18 +211,35 @@ func SendEmail(email string, emailType int) bool {
 	// for Postmark
 	if appConfig.EmailConf.Provider == "postmark" {
 		htmlModel := lib.HTMLModel(lib.StrArrHTMLModel(appConfig.EmailConf.HTMLModel))
-		htmlModel["secret_code"] = code
+		if code != 0 {
+			htmlModel["secret_code"] = code
+		}
+		if code == 0 {
+			htmlModel["secret_code"] = codeUUIDv4
+		}
 		htmlModel["email_validity_period"] = timestring.HourMinuteSecond(keyTTL)
+
+		optsLen := len(opts)
+		if optsLen > 0 {
+			for i := 0; i < optsLen; i++ {
+				key := fmt.Sprintf("additional_info_%d", i)
+				htmlModel[key] = opts[i]
+			}
+		}
 
 		params := PostmarkParams{}
 		params.ServerToken = appConfig.EmailConf.APIToken
 
-		if emailType == model.EmailTypeVerification {
+		if emailType == model.EmailTypeVerifyEmailNewAcc {
 			params.TemplateID = appConfig.EmailConf.EmailVerificationTemplateID
 		}
 
 		if emailType == model.EmailTypePassRecovery {
 			params.TemplateID = appConfig.EmailConf.PasswordRecoverTemplateID
+		}
+
+		if emailType == model.EmailTypeVerifyUpdatedEmail {
+			params.TemplateID = appConfig.EmailConf.EmailUpdateVerifyTemplateID
 		}
 
 		params.From = appConfig.EmailConf.AddrFrom
@@ -193,73 +254,18 @@ func SendEmail(email string, emailType int) bool {
 		res, err := Postmark(params)
 		if err != nil {
 			log.WithError(err).Error("error code: 405")
+			return false, err
 		}
 		if res.Message != "OK" {
-			log.Error(res)
+			return false, errors.New("email delivery failed")
 		}
-	} else {
-		fmt.Println("开发发邮件啦")
-		var body bytes.Buffer
 
-		temp, err := ParseTemplateDir("/home/ec2-user/gorest/gorest/templates")
-		if err != nil {
-			fmt.Println(err, "Could not parse template")
-			//log.Fatal("Could not parse template", err)
-		}
-		// 👇 Send Email
-		emailData := &EmailData{
-			URL:       strconv.FormatInt(int64(code), 10),
-			FirstName: "",
-			Subject:   "Your account verification code",
-		}
-		err = temp.ExecuteTemplate(&body, "resetPassword.html", &emailData)
-		if err != nil {
-			fmt.Println(err)
-		}
-		// Sender data.
-		from := "ai_gpt2023@163.com"
-		smtpPass := "XGRWKLMDWWEFLIAI"
-		smtpUser := "ai_gpt2023@163.com"
-		to := email
-		smtpHost := "smtp.163.com"
-		smtpPort := 465
-		fmt.Println(email, code)
-		m := gomail.NewMessage()
-		m.SetHeader("From", from)
-		m.SetHeader("To", to)
-		m.SetHeader("Subject", "Your account verification code")
-		m.SetBody("text/html", body.String())
-		m.AddAlternative("text/plain", html2text.HTML2Text(body.String()))
-
-		d := gomail.NewDialer(smtpHost, smtpPort, smtpUser, smtpPass)
-		d.TLSConfig = &tls.Config{InsecureSkipVerify: true}
-		// Send Email
-		fmt.Println("开发发邮件成功!")
-		if err := d.DialAndSend(m); err != nil {
-			fmt.Println("Could not send email: ", err)
-		}
+		return true, nil
 	}
 
-	return true
-}
-
-// 👇 Email template parser
-
-func ParseTemplateDir(dir string) (*template.Template, error) {
-	var paths []string
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			paths = append(paths, path)
-		}
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-	//fmt.Println(paths)
-	return template.ParseFiles(paths...)
+	e := errors.New(
+		"email delivery service provider: '" + appConfig.EmailConf.Provider + "' is unknown",
+	)
+	log.WithError(e).Error("error code: 406")
+	return false, e
 }

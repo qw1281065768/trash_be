@@ -17,7 +17,16 @@ type TwoFA struct {
 	UUIDSHA   string         `json:"-"`
 	UUIDEnc   string         `json:"-"`
 	Status    string         `json:"-"`
-	IDAuth    uint64         `json:"-"`
+	IDAuth    uint64         `gorm:"index" json:"-"`
+}
+
+// TwoFABackup model - 'two_fa_backups' table
+type TwoFABackup struct {
+	ID        uint64    `gorm:"primaryKey" json:"-"`
+	CreatedAt time.Time `json:"-"`
+	Code      string    `gorm:"-" json:"code"`
+	CodeHash  string    `json:"-"`
+	IDAuth    uint64    `gorm:"index" json:"-"`
 }
 
 // Secret2FA - save encoded secrets in RAM temporarily

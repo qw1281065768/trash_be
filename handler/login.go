@@ -1,11 +1,10 @@
 package handler
 
 import (
-	"crypto/sha256"
 	"net/http"
 	"strings"
 
-	"github.com/alexedwards/argon2id"
+	"github.com/pilinux/argon2"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/pilinux/gorest/config"
@@ -16,7 +15,8 @@ import (
 	"github.com/pilinux/gorest/service"
 )
 
-// Login handles jobs for controller.Login
+// Login receives tasks from controller.Login.
+// After authentication, it returns new access and refresh tokens.
 func Login(payload model.AuthPayload) (httpResponse model.HTTPResponse, httpStatusCode int) {
 	payload.Email = strings.TrimSpace(payload.Email)
 	if !lib.ValidateEmail(payload.Email) {
@@ -25,8 +25,16 @@ func Login(payload model.AuthPayload) (httpResponse model.HTTPResponse, httpStat
 		return
 	}
 
-	v, err := service.GetUserByEmail(payload.Email)
+	v, err := service.GetUserByEmail(payload.Email, false)
 	if err != nil {
+		if err.Error() != database.RecordNotFound {
+			// db read error
+			log.WithError(err).Error("error code: 1013.1")
+			httpResponse.Message = "internal server error"
+			httpStatusCode = http.StatusInternalServerError
+			return
+		}
+
 		httpResponse.Message = "email not found"
 		httpStatusCode = http.StatusNotFound
 		return
@@ -44,9 +52,9 @@ func Login(payload model.AuthPayload) (httpResponse model.HTTPResponse, httpStat
 		}
 	}
 
-	verifyPass, err := argon2id.ComparePasswordAndHash(payload.Password, v.Password)
+	verifyPass, err := argon2.ComparePasswordAndHash(payload.Password, configSecurity.HashSec, v.Password)
 	if err != nil {
-		log.WithError(err).Error("error code: 1011")
+		log.WithError(err).Error("error code: 1013.2")
 		httpResponse.Message = "internal server error"
 		httpStatusCode = http.StatusInternalServerError
 		return
@@ -60,7 +68,7 @@ func Login(payload model.AuthPayload) (httpResponse model.HTTPResponse, httpStat
 	// custom claims
 	claims := middleware.MyCustomClaims{}
 	claims.AuthID = v.AuthID
-	claims.Email = v.Email
+	// claims.Email
 	// claims.Role
 	// claims.Scope
 	// claims.TwoFA
@@ -74,17 +82,33 @@ func Login(payload model.AuthPayload) (httpResponse model.HTTPResponse, httpStat
 		twoFA := model.TwoFA{}
 
 		// have the user configured 2FA
-		if err := db.Where("id_auth = ?", v.AuthID).First(&twoFA).Error; err == nil {
+		err := db.Where("id_auth = ?", v.AuthID).First(&twoFA).Error
+		if err != nil {
+			if err.Error() != database.RecordNotFound {
+				// db read error
+				log.WithError(err).Error("error code: 1013.3")
+				httpResponse.Message = "internal server error"
+				httpStatusCode = http.StatusInternalServerError
+				return
+			}
+		}
+		if err == nil {
+			claims.TwoFA = twoFA.Status
+
 			// 2FA ON
 			if twoFA.Status == configSecurity.TwoFA.Status.On {
-				claims.TwoFA = twoFA.Status
-
-				// hash user's pass in sha256
-				hashPass := sha256.Sum256([]byte(payload.Password))
+				// hash user's pass
+				hashPass, err := service.GetHash([]byte(payload.Password))
+				if err != nil {
+					log.WithError(err).Error("error code: 1013.4")
+					httpResponse.Message = "internal server error"
+					httpStatusCode = http.StatusInternalServerError
+					return
+				}
 
 				// save the hashed pass in memory for OTP validation step
 				data2FA := model.Secret2FA{}
-				data2FA.PassSHA = hashPass[:]
+				data2FA.PassSHA = hashPass
 				model.InMemorySecret2FA[claims.AuthID] = data2FA
 			}
 		}
@@ -93,14 +117,14 @@ func Login(payload model.AuthPayload) (httpResponse model.HTTPResponse, httpStat
 	// issue new tokens
 	accessJWT, _, err := middleware.GetJWT(claims, "access")
 	if err != nil {
-		log.WithError(err).Error("error code: 1012")
+		log.WithError(err).Error("error code: 1013.5")
 		httpResponse.Message = "internal server error"
 		httpStatusCode = http.StatusInternalServerError
 		return
 	}
 	refreshJWT, _, err := middleware.GetJWT(claims, "refresh")
 	if err != nil {
-		log.WithError(err).Error("error code: 1013")
+		log.WithError(err).Error("error code: 1013.6")
 		httpResponse.Message = "internal server error"
 		httpStatusCode = http.StatusInternalServerError
 		return
@@ -109,17 +133,18 @@ func Login(payload model.AuthPayload) (httpResponse model.HTTPResponse, httpStat
 	jwtPayload := middleware.JWTPayload{}
 	jwtPayload.AccessJWT = accessJWT
 	jwtPayload.RefreshJWT = refreshJWT
+	jwtPayload.TwoAuth = claims.TwoFA
 
 	httpResponse.Message = jwtPayload
 	httpStatusCode = http.StatusOK
 	return
 }
 
-// Refresh handles jobs for controller.Refresh
+// Refresh receives tasks from controller.Refresh and
+// returns new pair of tokens (access and refresh tokens).
 func Refresh(claims middleware.MyCustomClaims) (httpResponse model.HTTPResponse, httpStatusCode int) {
-
 	// check validity
-	ok := service.ValidateUserID(claims.AuthID, claims.Email)
+	ok := service.ValidateAuthID(claims.AuthID)
 	if !ok {
 		httpResponse.Message = "access denied"
 		httpStatusCode = http.StatusUnauthorized
@@ -129,14 +154,14 @@ func Refresh(claims middleware.MyCustomClaims) (httpResponse model.HTTPResponse,
 	// issue new tokens
 	accessJWT, _, err := middleware.GetJWT(claims, "access")
 	if err != nil {
-		log.WithError(err).Error("error code: 1021")
+		log.WithError(err).Error("error code: 1014.1")
 		httpResponse.Message = "internal server error"
 		httpStatusCode = http.StatusInternalServerError
 		return
 	}
 	refreshJWT, _, err := middleware.GetJWT(claims, "refresh")
 	if err != nil {
-		log.WithError(err).Error("error code: 1022")
+		log.WithError(err).Error("error code: 1014.2")
 		httpResponse.Message = "internal server error"
 		httpStatusCode = http.StatusInternalServerError
 		return
@@ -145,6 +170,7 @@ func Refresh(claims middleware.MyCustomClaims) (httpResponse model.HTTPResponse,
 	jwtPayload := middleware.JWTPayload{}
 	jwtPayload.AccessJWT = accessJWT
 	jwtPayload.RefreshJWT = refreshJWT
+	jwtPayload.TwoAuth = claims.TwoFA
 
 	httpResponse.Message = jwtPayload
 	httpStatusCode = http.StatusOK
