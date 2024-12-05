@@ -4,6 +4,7 @@ package main
 import (
 	"fmt"
 	"github.com/pilinux/gorest/database/migrate"
+	"github.com/qw1281065768/trash_be/handler"
 	"github.com/qw1281065768/trash_be/router"
 
 	gconfig "github.com/pilinux/gorest/config"
@@ -142,6 +143,10 @@ func main() {
 			}
 		}
 	*/
+
+	// 初始化用户，设置用户ID和自身爆率
+	handler.InitUser(1, 1)
+	handler.InitUser(2, 2) // 另一个用户
 
 	r, err := router.SetupRouter(configure)
 	if err != nil {

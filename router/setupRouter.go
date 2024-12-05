@@ -3,13 +3,12 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/qw1281065768/trash_be/controller"
-
 	gconfig "github.com/pilinux/gorest/config"
 	gcontroller "github.com/pilinux/gorest/controller"
 	glib "github.com/pilinux/gorest/lib"
 	gmiddleware "github.com/pilinux/gorest/lib/middleware"
 	gservice "github.com/pilinux/gorest/service"
+	"github.com/qw1281065768/trash_be/controller"
 )
 
 // SetupRouter sets up all the routes
@@ -313,6 +312,11 @@ func SetupRouter(configure *gconfig.Configuration) (*gin.Engine, error) {
 		// QueryString demo
 		rQuery := v1.Group("query")
 		rQuery.GET("*q", controller.QueryString)
+
+		// Trash
+		trashGroup := v1.Group("trash")
+		trashGroup.GET("/start_hanging", controller.StartHanging) // Non-protected
+		trashGroup.GET("/stop_hanging", controller.StopHanging)   // Non-protected
 	}
 
 	return r, nil
