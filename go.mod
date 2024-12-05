@@ -1,4 +1,4 @@
-module github.com/pilinux/gorest
+module github.com/qw1281065768/trash_be
 
 go 1.20
 
@@ -13,6 +13,7 @@ require (
 	github.com/mrz1836/postmark v1.6.5
 	github.com/pilinux/argon2 v0.16.0
 	github.com/pilinux/crypt v0.0.11
+	github.com/pilinux/gorest v1.6.46
 	github.com/pilinux/libgo v0.0.5
 	github.com/pilinux/logrus v0.11.3
 	github.com/pilinux/structs v1.1.1
@@ -60,7 +61,6 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
 	github.com/pilinux/cryptoengine v0.1.7 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/sec51/convert v1.0.2 // indirect
 	github.com/tilinna/clock v1.1.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect

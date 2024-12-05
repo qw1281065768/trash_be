@@ -98,6 +98,8 @@ github.com/pilinux/crypt v0.0.11 h1:nTOH4rgoZpotzVHnrziKHZYbeonaoRJalxCqEkhAaZA=
 github.com/pilinux/crypt v0.0.11/go.mod h1:dwWcPMP1ilqj7edmDNaFCftf+R/QTyPNqX/TDHuczyE=
 github.com/pilinux/cryptoengine v0.1.7 h1:znNmaZd3b603AOpZFBsMhoTKPnPI9+0dEVnXi7tUs0Y=
 github.com/pilinux/cryptoengine v0.1.7/go.mod h1:cEtPLVXEO4VBT9F8n47uQS2A8O77LNTPgQ+drcyGhMA=
+github.com/pilinux/gorest v1.6.46 h1:9+vnfiJZUCYQCpEvFGICazBxZcFbPP2u+PJrOMiGwlQ=
+github.com/pilinux/gorest v1.6.46/go.mod h1:e4kg4QO7G2ghm822SyYMJ8nOUI0uTZgnq3gVTp1r/hY=
 github.com/pilinux/libgo v0.0.5 h1:vvCIeZbPhhtGHcosWYNQ0wIuM06DDtbUPl8PnXqAiGM=
 github.com/pilinux/libgo v0.0.5/go.mod h1:dRkAmsF0HiyctSiYgBMbn6nxRbyavlipm2lIzRjMFdE=
 github.com/pilinux/logrus v0.11.3 h1:l0w7MOO8JtWLPO764MoUqyC63XvU6JhWfnDmIcFaUFE=
@@ -114,7 +116,6 @@ github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZN
 github.com/qiniu/qmgo v1.1.9 h1:3G3h9RLyjIUW9YSAQEPP2WqqNnboZ2Z/zO3mugjVb3E=
 github.com/qiniu/qmgo v1.1.9/go.mod h1:aba4tNSlMWrwUhe7RdILfwBRIgvBujt1y10X+T1YZSI=
 github.com/rogpeppe/go-internal v1.12.0 h1:exVL4IDcn6na9z1rAb56Vxr+CgyK3nn3O+epU5NdKM8=
-github.com/rogpeppe/go-internal v1.12.0/go.mod h1:E+RYuTGaKKdloAfM02xzb0FW3Paa99yedzYV+kq4uf4=
 github.com/sec51/convert v1.0.2 h1:NoKWIRARjM3rQglNypMpcXSLLqPsN/uTTzaGeqDKbeg=
 github.com/sec51/convert v1.0.2/go.mod h1:5qL/cT/oiOIvWXy2SccQ7LnacYftqqy9wdyFkTc1k2w=
 github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ=
