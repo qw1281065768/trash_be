@@ -15,7 +15,7 @@ import (
 var (
 	userPool = make(map[int]*model.User) // 挂机池子，先用本地map存储，后续替换成分布式的
 
-	mu       sync.Mutex      // 锁以保护用户状态
+	mu       sync.Mutex // 锁以保护用户状态
 	mapItems = []model.Item{ // 示例地图物品
 		{"Item1", 0.3},  // 四等奖
 		{"Item2", 0.2},  // 三等奖
@@ -161,7 +161,11 @@ func CheckUserBag(UID string) (*CheckBagResponse, error) {
 // CheckALLHanging 查询整体的挂机
 func CheckALLHanging() map[int]*model.User {
 	for _, user := range userPool {
-		user.HangingTime = time.Now().Unix() - user.StartTime
+		if user.IsHanging {
+			user.HangingTime = time.Now().Unix() - user.StartTime
+		} else {
+			user.HangingTime = user.EndTime - user.StartTime
+		}
 	}
 	return userPool
 }
