@@ -315,8 +315,10 @@ func SetupRouter(configure *gconfig.Configuration) (*gin.Engine, error) {
 
 		// Trash
 		trashGroup := v1.Group("trash")
-		trashGroup.GET("/start_hanging", controller.StartHanging) // Non-protected
-		trashGroup.GET("/stop_hanging", controller.StopHanging)   // Non-protected
+		trashGroup.GET("/start_hanging", controller.StartHanging) // 开始挂机
+		trashGroup.GET("/stop_hanging", controller.StopHanging)   // 终止挂机
+		trashGroup.GET("/check_bag", controller.CheckBag)         // 查看用户背包
+		trashGroup.GET("/check_all", controller.CheckALLHanging)  // 查看所有挂机任务
 	}
 
 	return r, nil
