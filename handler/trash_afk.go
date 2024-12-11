@@ -17,10 +17,6 @@ var (
 
 	mu       sync.Mutex // 锁以保护用户状态
 	mapItems = []model.Item{ // 示例地图物品
-		{"Item1", 0.3},  // 四等奖
-		{"Item2", 0.2},  // 三等奖
-		{"Item3", 0.05}, // 二等奖
-		{"Item4", 0.05}, // 一等奖
 	}
 )
 

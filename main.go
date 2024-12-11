@@ -3,12 +3,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/pilinux/gorest/database/migrate"
+	"github.com/qw1281065768/trash_be/database/model"
 	"github.com/qw1281065768/trash_be/router"
 
 	gconfig "github.com/pilinux/gorest/config"
-	gdatabase "github.com/pilinux/gorest/database"
 	"github.com/qiniu/qmgo/options"
+	gdatabase "github.com/qw1281065768/trash_be/database"
 )
 
 func main() {
@@ -38,10 +38,10 @@ func main() {
 		*/
 
 		// Start DB migration
-		if err := migrate.StartMigration(*configure); err != nil {
+		/*if err := migrate.StartMigration(*configure); err != nil {
 			fmt.Println(err)
 			return
-		}
+		}*/
 
 	}
 
@@ -144,8 +144,8 @@ func main() {
 	*/
 
 	// 初始化用户，设置用户ID和自身爆率
-	//handler.InitUser(1, 1)
-	//handler.InitUser(2, 2) // 另一个用户
+	//model.PrintMap()
+	model.GetUserItemRelaByUserIDAndType(1, 0)
 
 	r, err := router.SetupRouter(configure)
 	if err != nil {
