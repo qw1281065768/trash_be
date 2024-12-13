@@ -3,7 +3,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/qw1281065768/trash_be/database/model"
 	"github.com/qw1281065768/trash_be/router"
 
 	gconfig "github.com/pilinux/gorest/config"
@@ -145,7 +144,7 @@ func main() {
 
 	// 初始化用户，设置用户ID和自身爆率
 	//model.PrintMap()
-	model.GetUserItemRelaByUserIDAndType(1, 0)
+	//model.GetUserItemRelaByUserIDAndType(1, 0)
 
 	r, err := router.SetupRouter(configure)
 	if err != nil {

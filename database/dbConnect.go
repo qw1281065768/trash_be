@@ -111,7 +111,8 @@ func InitDB() *gorm.DB {
 		db, err = gorm.Open(mysql.New(mysql.Config{
 			Conn: sqlDB,
 		}), &gorm.Config{
-			Logger: logger.Default.LogMode(logger.LogLevel(logLevel)),
+			//Logger: logger.Default.LogMode(logger.LogLevel(logLevel)),
+			Logger: logger.Default.LogMode(logger.Info),
 		})
 		if err != nil {
 			log.WithError(err).Panic("panic code: 152")

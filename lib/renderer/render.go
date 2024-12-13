@@ -7,6 +7,7 @@ package renderer
 // Copyright (c) 2022 pilinux
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -32,6 +33,7 @@ func Render(c *gin.Context, data interface{}, statusCode int, htmlTpl ...string)
 		return
 	}
 
+	fmt.Println(data)
 	// Respond with JSON
 	c.SecureJSON(statusCode, data)
 }

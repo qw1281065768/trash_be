@@ -30,10 +30,10 @@ type Item struct {
 	Probability  float64
 }
 
-var itemMap map[int64]Item
+var GlobalItemMap map[int64]Item
 
 func init() {
-	itemMap = make(map[int64]Item)
+	GlobalItemMap = make(map[int64]Item)
 
 	// 2. 打开 Excel 文件
 	file, err := excelize.OpenFile("./files/items.xlsx")
@@ -54,9 +54,6 @@ func init() {
 		if i == 0 {
 			continue
 		}
-		//fmt.Println(row)
-
-		//continue
 		// 解析每一行数据
 		item := Item{
 			ID:           parseInt64(row[0]),
@@ -76,12 +73,12 @@ func init() {
 			Exp:          parseInt(row[16]),
 			Price:        parseInt(row[17]),
 		}
-		itemMap[parseInt64(row[0])] = item
+		GlobalItemMap[parseInt64(row[0])] = item
 	}
 }
 
 func PrintMap() {
-	fmt.Println(itemMap)
+	fmt.Println(GlobalItemMap)
 }
 
 // 辅助函数：将字符串转换为整数

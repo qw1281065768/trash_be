@@ -1,4 +1,4 @@
-package model
+package database
 
 // HTTPResponse - final response to the api consumers
 type HTTPResponse struct {

@@ -1,4 +1,4 @@
-package model
+package database
 
 // KeyValue - general model to process
 // key-value pair
