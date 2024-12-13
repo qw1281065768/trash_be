@@ -11,23 +11,23 @@ import (
 }*/
 
 type Item struct {
-	ID           int64  `json:"id"`
-	Name         string `json:"name"`
-	Type         int    `json:"type"`
-	TypeName     string `json:"type_name"`
-	Property     string `json:"property"`
-	PropertyName string `json:"property_name"`
-	DuringTime   int64  `json:"during_time"`
-	Desc         string `json:"desc"`
-	OriImgUrl    string `json:"ori_img_url"`
-	TinyImgUrl   string `json:"tiny_img_url"`
-	Source       int    `json:"source"`
-	Level        int    `json:"level"`
-	Material     string `json:"material"`
-	Weight       int    `json:"weight"`
-	Exp          int    `json:"exp"`
-	Price        int    `json:"price"`
-	Probability  float64
+	ID             int64  `json:"id"`
+	Name           string `json:"name"`
+	Type           int    `json:"type"`
+	TypeName       string `json:"type_name"`
+	Property       string `json:"property"`
+	PropertyName   string `json:"property_name"`
+	DuringTime     int64  `json:"during_time"`
+	ServLimitCount int64  `json:"servLimitCount"`
+	Desc           string `json:"desc"`
+	OriImgUrl      string `json:"ori_img_url"`
+	Source         int    `json:"source"`
+	Level          int    `json:"level"`
+	Material       string `json:"material"`
+	Weight         int    `json:"weight"`
+	Exp            int    `json:"exp"`
+	Price          int    `json:"price"`
+	Probability    float64
 }
 
 var GlobalItemMap map[int64]Item
@@ -56,22 +56,22 @@ func init() {
 		}
 		// 解析每一行数据
 		item := Item{
-			ID:           parseInt64(row[0]),
-			Name:         row[1],
-			Type:         parseInt(row[2]),
-			TypeName:     row[3],
-			Property:     row[4],
-			PropertyName: row[5],
-			DuringTime:   parseInt64(row[6]),
-			Desc:         row[7],
-			OriImgUrl:    row[10],
-			TinyImgUrl:   row[11],
-			Source:       parseInt(row[12]),
-			Level:        parseInt(row[13]),
-			Material:     row[14],
-			Weight:       parseInt(row[15]),
-			Exp:          parseInt(row[16]),
-			Price:        parseInt(row[17]),
+			ID:             parseInt64(row[0]),
+			Name:           row[1],
+			TypeName:       row[2],
+			Type:           parseInt(row[3]),
+			Property:       row[4],
+			PropertyName:   row[5],
+			DuringTime:     parseInt64(row[6]),
+			ServLimitCount: parseInt64(row[7]),
+			Desc:           row[8],
+			OriImgUrl:      row[9],
+			Source:         parseInt(row[10]),
+			Level:          parseInt(row[11]),
+			Material:       row[12],
+			Weight:         parseInt(row[13]),
+			Exp:            parseInt(row[14]),
+			Price:          parseInt(row[15]),
 		}
 		GlobalItemMap[parseInt64(row[0])] = item
 	}
