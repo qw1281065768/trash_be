@@ -54,3 +54,17 @@ func init() {
 		GlobalTrashMap[parseInt64(row[0])] = trashMap
 	}
 }
+
+func GetMapListByUserLevel(level int) []TrashMap {
+	resp := make([]TrashMap, 0)
+	for _, v := range GlobalTrashMap {
+		// 符合关卡逻辑。需要等级<=用户等级
+		if v.UserLevel <= level {
+			resp = append(resp, v)
+		}
+	}
+
+	return resp
+}
+
+func CheckMapIfUNlock() {}

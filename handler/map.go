@@ -1,24 +1,20 @@
 package handler
 
 import (
+	"fmt"
+	"github.com/qw1281065768/trash_be/database"
 	"github.com/qw1281065768/trash_be/model"
 )
 
-func GetTrashMapList(userID int64) []model.TrashMap {
+// GetTrashMapListByMainLevel 根据主关卡获取已解锁的关卡名称
+func GetTrashMapListByMainLevel(userID int64, mainLevel int) []model.TrashMap {
 
 	mapList := make([]model.TrashMap, 0)
-	/*resp, err := database.GetUserItemRelaByUserIDANDType(userID, int8(itemType))
+	user, err := database.GetUserInfo(userID)
 	if err != nil {
 		fmt.Println(err)
-		return itemList
+		return nil
 	}
-	for _, v := range resp {
-		itemInfo := model.GlobalItemMap[v.ItemID]
-		itemInfo.OriImgUrl = "4001001"
-		itemList = append(itemList, itemInfo)
-		itemList = append(itemList, itemInfo)
-	}*/
-
 	// 获取用户的等级
 
 	// 获取可以解锁的地图列表
