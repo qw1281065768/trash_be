@@ -38,6 +38,12 @@ func InitUser(id int, ownDropRate float64) *model.User {
 func StartHangingHandler(UID string) {
 	userID, _ := strconv.ParseInt(UID, 10, 64) // 这里根据请求获取用户ID
 	fmt.Println(mapItems)
+	if len(mapItems) == 0 {
+		// 地图里没有掉落的物品
+		fmt.Println("empty map items")
+		return
+	}
+
 	user, exists := userPool[int(userID)]
 	if !exists {
 		fmt.Println("User not found")
