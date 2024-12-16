@@ -13,6 +13,6 @@ func GetUserMaps(c *gin.Context) {
 	id := strings.TrimSpace(c.Query("uid"))
 	userID, _ := strconv.ParseInt(id, 10, 64)
 	fmt.Println(userID)
-	resp := handler.GetTrashMapList(userID)
+	resp := handler.GetTrashMapListByMainLevel(userID, 1)
 	c.JSON(200, resp)
 }

@@ -16,6 +16,7 @@ func GetTrashMapListByMainLevel(userID int64, mainLevel int) []model.TrashMap {
 		return nil
 	}
 	// 获取用户的等级
+	fmt.Println(user.Level)
 
 	// 获取可以解锁的地图列表
 
