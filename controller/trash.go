@@ -15,6 +15,10 @@ func StartHanging(c *gin.Context) {
 		return
 	}
 
+	// TODO 新增地图id + 工具列表
+
+	// 需要判断用户是否解锁了地图 以及 是否拥有相关工具
+
 	handler.StartHangingHandler(query)
 	grenderer.Render(c, nil, 200)
 }
