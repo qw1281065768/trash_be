@@ -9,7 +9,7 @@ import (
 func GetItemList(userID int64, itemType int) []model.Item {
 
 	itemList := make([]model.Item, 0)
-	resp, err := database.g(userID, int8(itemType))
+	resp, err := database.GetUserItemRelaByUserIDANDType(userID, int8(itemType))
 	if err != nil {
 		fmt.Println(err)
 		return itemList
