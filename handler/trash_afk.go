@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"fmt"
+	"github.com/qw1281065768/trash_be/database"
 	"github.com/qw1281065768/trash_be/model"
 	"math/rand"
 	"net/http"
@@ -13,21 +14,21 @@ import (
 
 // 挂机玩法，涉及到的表和数据
 var (
-	userPool = make(map[int]*model.HangingUser) // 挂机池子，先用本地map存储，后续替换成分布式的
+	userPool = make(map[int64]*model.HangingUser) // 挂机池子，先用本地map存储，后续替换成分布式的
 
 	mu sync.Mutex // 锁以保护用户状态
 	//mapItems = []model.Item{ // 示例地图物品
 )
 
 // 初始化用户数据，一般是在用户开始挂机的时候来使用
-func InitUser(id int, ownDropRate float64) *model.HangingUser {
+func InitUser(id int64, ownDropRate float64) *model.HangingUser {
 	mu.Lock()
 	userPool[id] = &model.HangingUser{
 		ID:          id,
-		BagLimit:    100,
+		BagLimit:    20,
 		TimeLimit:   300,
 		OwnDropRate: ownDropRate,
-		Bag:         make(map[string]int),
+		Bag:         make(map[int64]int),
 		StartTime:   time.Now().Unix(),
 	}
 	mu.Unlock()
@@ -46,10 +47,10 @@ func StartHangingHandler(UID string, mapID int64, toolList []string) {
 		return
 	}
 
-	user, exists := userPool[int(userID)]
+	user, exists := userPool[userID]
 	if !exists {
 		fmt.Println("User not found")
-		user = InitUser(int(userID), 1)
+		user = InitUser(userID, 1)
 	}
 	if user.IsHanging {
 		fmt.Println("Already hanging")
@@ -63,7 +64,7 @@ func StartHangingHandler(UID string, mapID int64, toolList []string) {
 func StopHangingHandler(UID string) {
 	userID, _ := strconv.ParseInt(UID, 10, 64)
 	fmt.Printf("stopped for user %s\n", UID)
-	user, exists := userPool[int(userID)]
+	user, exists := userPool[userID]
 	if !exists {
 		fmt.Println("User not found", http.StatusNotFound)
 		return
@@ -95,13 +96,13 @@ func hangUser(user *model.HangingUser) {
 
 // 一次物品搜寻，爆率初始化为1（实际上就是抽奖次数，2倍的话就是抽两次）
 func searchItems(user *model.HangingUser) {
-	foundItems := make(map[string]int) // 存储捡到的物品及数量
+	foundItems := make(map[int64]int) // 存储捡到的物品及数量
 
 	fmt.Printf("Searching items for user %d\n", user.ID)
 	// 每次捡取物品的逻辑
 	for _, item := range user.MapItems {
 		if rand.Float64() < item.Probability*user.OwnDropRate { // 根据概率决定是否捡取
-			foundItems[item.ItemName]++ // 增加捡到的物品数量
+			foundItems[item.ItemID]++ // 增加捡到的物品数量
 		}
 	}
 
@@ -120,7 +121,7 @@ func searchItems(user *model.HangingUser) {
 			}
 			user.Bag[itemName] += count // 更新背包中的物品数量
 			totalItems += count         // 更新背包中物品的总数量
-			fmt.Printf("User %d got item: %s (x%d) | Bag: %v\n", user.ID, itemName, count, user.Bag)
+			fmt.Printf("User %d got item: %d (x%d) | Bag: %v\n", user.ID, itemName, count, user.Bag)
 		}
 	}
 	mu.Unlock()
@@ -128,13 +129,13 @@ func searchItems(user *model.HangingUser) {
 
 // CheckBagResponse 返回最近一次挂机的数据
 type CheckBagResponse struct {
-	HangingStartTime    int64          `json:"hanging_start_time"`     // 挂机开始时间，时间戳
-	HangingStartTimeStr string         `json:"hanging_start_time_str"` // 挂机开始时间，日期+时分秒
-	DuringTime          int64          `json:"during_time"`            // 挂机时长
-	IsHanging           bool           `json:"is_hanging"`             // 是否挂机中
-	BagLimit            int            `json:"bag_limit"`              // 背包容量
-	UserID              string         `json:"user_id"`                // 用户id
-	BagContent          map[string]int `json:"bag_content"`            // 背包内容，物品名称+数量
+	HangingStartTime    int64         `json:"hanging_start_time"`     // 挂机开始时间，时间戳
+	HangingStartTimeStr string        `json:"hanging_start_time_str"` // 挂机开始时间，日期+时分秒
+	DuringTime          int64         `json:"during_time"`            // 挂机时长
+	IsHanging           bool          `json:"is_hanging"`             // 是否挂机中
+	BagLimit            int           `json:"bag_limit"`              // 背包容量
+	UserID              string        `json:"user_id"`                // 用户id
+	BagContent          map[int64]int `json:"bag_content"`            // 背包内容，物品名称+数量
 }
 
 // CheckUserBag 查找用户上一次挂机的信息
@@ -143,7 +144,7 @@ func CheckUserBag(UID string) (*CheckBagResponse, error) {
 		UserID: UID,
 	}
 	userID, _ := strconv.ParseInt(UID, 10, 64)
-	user, exists := userPool[int(userID)]
+	user, exists := userPool[userID]
 	if !exists {
 		fmt.Println("User not found")
 		return nil, errors.New("User not found")
@@ -164,7 +165,7 @@ func CheckUserBag(UID string) (*CheckBagResponse, error) {
 }
 
 // CheckALLHanging 查询整体的挂机
-func CheckALLHanging() map[int]*model.HangingUser {
+func CheckALLHanging() map[int64]*model.HangingUser {
 	for _, user := range userPool {
 		if user.IsHanging {
 			user.HangingTime = time.Now().Unix() - user.StartTime
@@ -178,4 +179,11 @@ func CheckALLHanging() map[int]*model.HangingUser {
 func shutdownHanging(user *model.HangingUser) {
 	user.IsHanging = false
 	user.EndTime = time.Now().Unix()
+	// add
+	err := database.AddItems(user.ID, user.Bag)
+	if err != nil {
+		fmt.Println("Error adding items", err.Error())
+	}
+	// clear pool
+	delete(userPool, user.ID)
 }

@@ -2,6 +2,8 @@ package database
 
 import (
 	"fmt"
+	"gorm.io/gorm"
+	"time"
 )
 
 type UserItemRela struct {
@@ -40,4 +42,41 @@ func GetUserItemRelaByUserIDANDType(userID int64, itemType int8) ([]UserItemRela
 		return nil, err
 	}
 	return uirs, nil
+}
+
+// AddItems 更新或添加物品到用户背包
+func AddItems(userID int64, items map[int64]int) error {
+	db := GetDB()
+	for itemID, quantity := range items {
+		var userItem UserItemRela
+		// 查找用户-物品记录
+		result := db.First(&userItem, "user_id = ? AND item_id = ?", userID, itemID)
+
+		if result.Error != nil {
+			if result.Error == gorm.ErrRecordNotFound {
+				// 如果没有记录，创建新记录
+				userItem = UserItemRela{
+					UserID:     userID,
+					ItemID:     itemID,
+					ItemType:   1, // 假设 item_type 设置为 1，您可以根据需要调整
+					CreateTime: time.Now().Unix(),
+					UpdateTime: time.Now().Unix(),
+					Count:      quantity,
+				}
+				if err := db.Create(&userItem).Error; err != nil {
+					return err
+				}
+			} else {
+				return result.Error
+			}
+		} else {
+			// 如果已有记录，更新数量和更新时间
+			userItem.Count += quantity
+			userItem.UpdateTime = time.Now().Unix()
+			if err := db.Save(&userItem).Error; err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
