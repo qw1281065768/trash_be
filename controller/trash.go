@@ -4,22 +4,33 @@ import (
 	"github.com/gin-gonic/gin"
 	grenderer "github.com/pilinux/gorest/lib/renderer"
 	"github.com/qw1281065768/trash_be/handler"
+	"strconv"
 	"strings"
 )
 
 // QueryString - basic implementation
 func StartHanging(c *gin.Context) {
-	query := strings.TrimSpace(c.Query("uid"))
-	if query == "" {
-		c.JSON(400, gin.H{"msg": query})
+	uid := strings.TrimSpace(c.Query("uid"))
+	if uid == "" {
+		c.JSON(400, gin.H{"uid": uid})
+		return
+	}
+	mapIDStr := strings.TrimSpace(c.Query("mapid"))
+	if mapIDStr == "" {
+		c.JSON(400, gin.H{"mapid": mapIDStr})
+		return
+	}
+	toolListStr := strings.TrimSpace(c.Query("tools"))
+	if toolListStr == "" {
+		c.JSON(400, gin.H{"tools": uid})
 		return
 	}
 
-	// TODO 新增地图id + 工具列表
+	// TODO 需要判断用户是否解锁了地图 以及 是否拥有相关工具
+	mapID, _ := strconv.ParseInt(mapIDStr, 10, 64)
+	toolList := strings.Split(toolListStr, ",")
 
-	// 需要判断用户是否解锁了地图 以及 是否拥有相关工具
-
-	handler.StartHangingHandler(query)
+	handler.StartHangingHandler(uid, mapID, toolList)
 	grenderer.Render(c, nil, 200)
 }
 

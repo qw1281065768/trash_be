@@ -13,19 +13,18 @@ import (
 
 // 挂机玩法，涉及到的表和数据
 var (
-	userPool = make(map[int]*model.User) // 挂机池子，先用本地map存储，后续替换成分布式的
+	userPool = make(map[int]*model.HangingUser) // 挂机池子，先用本地map存储，后续替换成分布式的
 
-	mu       sync.Mutex // 锁以保护用户状态
-	mapItems = []model.Item{ // 示例地图物品
-	}
+	mu sync.Mutex // 锁以保护用户状态
+	//mapItems = []model.Item{ // 示例地图物品
 )
 
 // 初始化用户数据，一般是在用户开始挂机的时候来使用
-func InitUser(id int, ownDropRate float64) *model.User {
+func InitUser(id int, ownDropRate float64) *model.HangingUser {
 	mu.Lock()
-	userPool[id] = &model.User{
+	userPool[id] = &model.HangingUser{
 		ID:          id,
-		BagLimit:    10,
+		BagLimit:    100,
 		TimeLimit:   300,
 		OwnDropRate: ownDropRate,
 		Bag:         make(map[string]int),
@@ -35,8 +34,11 @@ func InitUser(id int, ownDropRate float64) *model.User {
 	return userPool[id]
 }
 
-func StartHangingHandler(UID string) {
+func StartHangingHandler(UID string, mapID int64, toolList []string) {
 	userID, _ := strconv.ParseInt(UID, 10, 64) // 这里根据请求获取用户ID
+
+	// TODO find mapItems by mapid
+	mapItems := model.MapItemsFall[mapID]
 	fmt.Println(mapItems)
 	if len(mapItems) == 0 {
 		// 地图里没有掉落的物品
@@ -53,6 +55,7 @@ func StartHangingHandler(UID string) {
 		fmt.Println("Already hanging")
 		return
 	}
+	user.MapItems = mapItems
 	go hangUser(user)
 	fmt.Printf("Hanging started for user %d\n", user.ID)
 }
@@ -69,7 +72,7 @@ func StopHangingHandler(UID string) {
 	fmt.Printf("Hanging stopped for user %d\n", user.ID)
 }
 
-func hangUser(user *model.User) {
+func hangUser(user *model.HangingUser) {
 	ticker := time.NewTicker(5 * time.Second)
 	user.IsHanging = true
 	defer ticker.Stop()
@@ -91,14 +94,14 @@ func hangUser(user *model.User) {
 }
 
 // 一次物品搜寻，爆率初始化为1（实际上就是抽奖次数，2倍的话就是抽两次）
-func searchItems(user *model.User) {
+func searchItems(user *model.HangingUser) {
 	foundItems := make(map[string]int) // 存储捡到的物品及数量
 
 	fmt.Printf("Searching items for user %d\n", user.ID)
 	// 每次捡取物品的逻辑
-	for _, item := range mapItems {
+	for _, item := range user.MapItems {
 		if rand.Float64() < item.Probability*user.OwnDropRate { // 根据概率决定是否捡取
-			foundItems[item.Name]++ // 增加捡到的物品数量
+			foundItems[item.ItemName]++ // 增加捡到的物品数量
 		}
 	}
 
@@ -161,7 +164,7 @@ func CheckUserBag(UID string) (*CheckBagResponse, error) {
 }
 
 // CheckALLHanging 查询整体的挂机
-func CheckALLHanging() map[int]*model.User {
+func CheckALLHanging() map[int]*model.HangingUser {
 	for _, user := range userPool {
 		if user.IsHanging {
 			user.HangingTime = time.Now().Unix() - user.StartTime
@@ -172,7 +175,7 @@ func CheckALLHanging() map[int]*model.User {
 	return userPool
 }
 
-func shutdownHanging(user *model.User) {
+func shutdownHanging(user *model.HangingUser) {
 	user.IsHanging = false
 	user.EndTime = time.Now().Unix()
 }

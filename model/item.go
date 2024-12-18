@@ -27,7 +27,6 @@ type Item struct {
 	Weight         int    `json:"weight"`
 	Exp            int    `json:"exp"`
 	Price          int    `json:"price"`
-	Probability    float64
 }
 
 var GlobalItemMap map[int64]Item
