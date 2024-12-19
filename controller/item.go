@@ -20,7 +20,7 @@ func GetUserItems(c *gin.Context) {
 	if itemType == 0 {
 		itemType = 1
 	}
-	resp := handler.GetItemList(userID, int(itemType))
+	resp := handler.GetItemListALL(userID)
 	c.JSON(200, resp)
 	//grenderer.Render(c, resp, 0)
 }

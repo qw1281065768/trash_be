@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"github.com/qw1281065768/trash_be/model"
 	"gorm.io/gorm"
 	"time"
 )
@@ -58,7 +59,7 @@ func AddItems(userID int64, items map[int64]int) error {
 				userItem = UserItemRela{
 					UserID:     userID,
 					ItemID:     itemID,
-					ItemType:   1, // 假设 item_type 设置为 1，您可以根据需要调整
+					ItemType:   int8(model.GlobalItemMap[itemID].Type), // 假设 item_type 设置为 1，您可以根据需要调整
 					CreateTime: time.Now().Unix(),
 					UpdateTime: time.Now().Unix(),
 					Count:      quantity,
