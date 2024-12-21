@@ -38,7 +38,6 @@ func InitUser(id int64, ownDropRate float64) *model.HangingUser {
 func StartHangingHandler(UID string, mapID int64, toolList []string) {
 	userID, _ := strconv.ParseInt(UID, 10, 64) // 这里根据请求获取用户ID
 
-	// TODO find mapItems by mapid
 	mapItems := model.MapItemsFall[mapID]
 	fmt.Println(mapItems)
 	if len(mapItems) == 0 {
@@ -47,15 +46,16 @@ func StartHangingHandler(UID string, mapID int64, toolList []string) {
 		return
 	}
 
+	// 用户不存在，第一次调用接口，直接初始化
 	user, exists := userPool[userID]
-	if !exists {
-		fmt.Println("User not found")
-		user = InitUser(userID, 1)
-	}
-	if user.IsHanging {
+	// 用户存在，并且已经在挂机中，直接退出
+	if exists && user.IsHanging {
 		fmt.Println("Already hanging")
 		return
 	}
+	// todo 清空池子，重新开始，先不支持单独收菜，点击停止，直接收
+	user = InitUser(userID, 1)
+	// 初始化地图资源
 	user.MapItems = mapItems
 	go hangUser(user)
 	fmt.Printf("Hanging started for user %d\n", user.ID)
@@ -136,6 +136,7 @@ type CheckBagResponse struct {
 	BagLimit            int           `json:"bag_limit"`              // 背包容量
 	UserID              string        `json:"user_id"`                // 用户id
 	BagContent          map[int64]int `json:"bag_content"`            // 背包内容，物品名称+数量
+	BagDetail           []*ItemDetail `json:"bag_detail"`
 }
 
 // CheckUserBag 查找用户上一次挂机的信息
@@ -159,6 +160,24 @@ func CheckUserBag(UID string) (*CheckBagResponse, error) {
 		resp.DuringTime = time.Now().Unix() - user.StartTime
 	} else {
 		resp.DuringTime = user.EndTime - user.StartTime
+	}
+	if user.Bag != nil {
+		for k, v := range user.Bag {
+			itemInfo := model.GlobalItemMap[k]
+			//itemInfo.OriImgUrl = "4001001"
+			tmpItemInfo := &ItemDetail{
+				ID:           itemInfo.ID,
+				Name:         itemInfo.Name,
+				Type:         itemInfo.Type,
+				TypeName:     itemInfo.TypeName,
+				Property:     itemInfo.Property,
+				PropertyName: itemInfo.PropertyName,
+				Description:  itemInfo.Desc,
+				Price:        itemInfo.Price,
+				Count:        v,
+			}
+			resp.BagDetail = append(resp.BagDetail, tmpItemInfo)
+		}
 	}
 
 	return resp, nil
@@ -185,5 +204,10 @@ func shutdownHanging(user *model.HangingUser) {
 		fmt.Println("Error adding items", err.Error())
 	}
 	// clear pool
-	delete(userPool, user.ID)
+	// delete(userPool, user.ID)
+}
+
+func clearUserPool(userID int64) {
+	fmt.Println("Clearing user", userID)
+	delete(userPool, userID)
 }

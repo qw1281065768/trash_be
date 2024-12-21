@@ -12,3 +12,8 @@ type HangingUser struct {
 	TimeLimit   int64         // 挂机最长时间
 	MapItems    []ItemsFall   // 地图爆的物品
 }
+
+type BagItem struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
