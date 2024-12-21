@@ -7,6 +7,7 @@ import (
 	"github.com/qw1281065768/trash_be/model"
 	"math/rand"
 	"net/http"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -16,7 +17,8 @@ import (
 var (
 	userPool = make(map[int64]*model.HangingUser) // 挂机池子，先用本地map存储，后续替换成分布式的
 
-	mu sync.Mutex // 锁以保护用户状态
+	mu    sync.Mutex // 锁以保护用户状态
+	bagMu sync.Mutex
 	//mapItems = []model.Item{ // 示例地图物品
 )
 
@@ -119,8 +121,10 @@ func searchItems(user *model.HangingUser) {
 				count = availableSpace // 限制捡取数量
 				shutdownHanging(user)  // 终止挂机
 			}
+			bagMu.Lock()
 			user.Bag[itemName] += count // 更新背包中的物品数量
-			totalItems += count         // 更新背包中物品的总数量
+			bagMu.Unlock()
+			totalItems += count // 更新背包中物品的总数量
 			fmt.Printf("User %d got item: %d (x%d) | Bag: %v\n", user.ID, itemName, count, user.Bag)
 		}
 	}
@@ -179,6 +183,10 @@ func CheckUserBag(UID string) (*CheckBagResponse, error) {
 			resp.BagDetail = append(resp.BagDetail, tmpItemInfo)
 		}
 	}
+	// resp.BagDetail 排序
+	sort.Slice(resp.BagDetail, func(i, j int) bool {
+		return resp.BagDetail[i].ID < resp.BagDetail[j].ID // 根据 ID 排序
+	})
 
 	return resp, nil
 }
