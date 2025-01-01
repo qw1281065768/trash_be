@@ -16,3 +16,14 @@ func GetUserMaps(c *gin.Context) {
 	resp := handler.GetTrashMapListByMainLevel(userID, 1)
 	c.JSON(200, resp)
 }
+
+// GetMapInfo
+func GetMapInfo(c *gin.Context) {
+	id := strings.TrimSpace(c.Query("mapid"))
+	mapID, _ := strconv.ParseInt(id, 10, 64)
+	resp, err := handler.GetMapInfoByMapID(mapID)
+	if err != nil {
+		c.JSON(400, gin.H{})
+	}
+	c.JSON(200, resp)
+}

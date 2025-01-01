@@ -327,6 +327,7 @@ func SetupRouter(configure *gconfig.Configuration) (*gin.Engine, error) {
 		// Map
 		mapGroup := v1.Group("map")
 		mapGroup.GET("/user_maps", controller.GetUserMaps)
+		mapGroup.GET("/info", controller.GetMapInfo)
 	}
 
 	return r, nil
