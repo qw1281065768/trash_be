@@ -25,8 +25,8 @@ func GetTrashMapListByMainLevel(userID int64, mainLevel int) []model.TrashMap {
 }
 
 type MapInfo struct {
-	Info      model.TrashMap
-	ItemFalls []model.ItemsFall
+	Info      model.TrashMap    `json:"info"`
+	ItemFalls []model.ItemsFall `json:"item_falls"`
 }
 
 func GetMapInfoByMapID(mapID int64) (*MapInfo, error) {
