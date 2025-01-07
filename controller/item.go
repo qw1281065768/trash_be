@@ -24,3 +24,21 @@ func GetUserItems(c *gin.Context) {
 	c.JSON(200, resp)
 	//grenderer.Render(c, resp, 0)
 }
+
+// SingleSellItems - GET 单个卖，以及多个卖
+func SingleSellItems(c *gin.Context) {
+	uid := strings.TrimSpace(c.PostForm("uid"))
+	id := strings.TrimSpace(c.Query("item_id"))
+	count := strings.TrimSpace(c.Query("count"))
+
+	userID, _ := strconv.ParseInt(uid, 10, 64)
+	itemID, _ := strconv.ParseInt(id, 10, 64)
+	itemCount, _ := strconv.ParseInt(count, 10, 64)
+
+	fmt.Println(userID)
+	err := handler.SingleSellItem(userID, itemID, int(itemCount))
+	if err != nil {
+		c.JSON(400, nil)
+	}
+	c.JSON(200, nil)
+}

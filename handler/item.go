@@ -64,3 +64,41 @@ func GetItemListALL(userID int64) []ItemDetail {
 
 	return itemList
 }
+
+func SingleSellItem(userID int64, itemID int64, count int) error {
+	// check 是否存在这么多物品
+	itemList := GetItemListALL(userID)
+	exist := false
+	sum := 0
+	for _, v := range itemList {
+		if v.ID == itemID && v.Count >= count {
+			exist = true
+			// 计算总价格
+			sum = v.Price * count
+		}
+	}
+
+	if !exist {
+		return fmt.Errorf("count not enough")
+	}
+
+	// 用户资产增加
+	user, err := database.GetUserInfo(userID)
+	if err != nil {
+		return err
+	}
+	user.Money += sum
+	err = database.UpdateUser(user)
+	if err != nil {
+		return err
+	}
+
+	// 物品数量扣除
+	err = database.UpdateUserItemCount(userID, itemID, count)
+	if err != nil {
+		return err
+	}
+
+	// 返回结果
+	return nil
+}

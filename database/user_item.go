@@ -81,3 +81,23 @@ func AddItems(userID int64, items map[int64]int) error {
 	}
 	return nil
 }
+
+func UpdateUserItemCount(userID, itemID int64, count int) error {
+	db := GetDB()
+	var userItem UserItemRela
+	// 查找用户-物品记录
+	result := db.First(&userItem, "user_id = ? AND item_id = ?", userID, itemID)
+	if result.Error != nil {
+		return fmt.Errorf("no more items")
+	}
+	if userItem.Count < count {
+		return fmt.Errorf("no enough items")
+	}
+
+	userItem.Count -= count
+	userItem.UpdateTime = time.Now().Unix()
+	if err := db.Save(&userItem).Error; err != nil {
+		return err
+	}
+	return nil
+}

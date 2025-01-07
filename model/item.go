@@ -15,7 +15,7 @@ type Item struct {
 	Name           string `json:"name"`
 	Type           int    `json:"type"`
 	TypeName       string `json:"type_name"`
-	Property       string `json:"property"`
+	Property       string `json:"property"` // 包含武器的属性，大多数物品没有属性
 	PropertyName   string `json:"property_name"`
 	DuringTime     int64  `json:"during_time"`
 	ServLimitCount int64  `json:"servLimitCount"`
