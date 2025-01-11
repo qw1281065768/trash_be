@@ -68,18 +68,27 @@ func GetItemListALL(userID int64) []ItemDetail {
 func SingleSellItem(userID int64, itemID int64, count int) error {
 	// check 是否存在这么多物品
 	itemList := GetItemListALL(userID)
+	fmt.Println(itemList)
 	exist := false
 	sum := 0
+	existCount := 0
 	for _, v := range itemList {
-		if v.ID == itemID && v.Count >= count {
-			exist = true
-			// 计算总价格
-			sum = v.Price * count
+		fmt.Println(v.ID, itemID)
+		if v.ID == itemID {
+			fmt.Println("111111")
+			existCount = v.Count
+			if v.Count >= count {
+				exist = true
+				// 计算总价格
+				sum = v.Price * count
+			} else {
+				break
+			}
 		}
 	}
 
 	if !exist {
-		return fmt.Errorf("count not enough")
+		return fmt.Errorf("count not enough: input : %d, exist : %d", count, existCount)
 	}
 
 	// 用户资产增加

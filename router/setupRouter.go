@@ -225,22 +225,6 @@ func SetupRouter(configure *gconfig.Configuration) (*gin.Engine, error) {
 			// resend verification code to verify the modified email address
 			rEmail.POST("resend-verification-email", gcontroller.ResendVerificationCodeToModifyActiveEmail)
 
-			// User
-			rUsers := v1.Group("users")
-			rUsers.GET("", controller.GetUsers)    // Non-protected
-			rUsers.GET("/:id", controller.GetUser) // Non-protected
-			rUsers.Use(gmiddleware.JWT()).Use(gservice.JWTBlacklistChecker())
-			if gconfig.Is2FA() {
-				rUsers.Use(gmiddleware.TwoFA(
-					configure.Security.TwoFA.Status.On,
-					configure.Security.TwoFA.Status.Off,
-					configure.Security.TwoFA.Status.Verified,
-				))
-			}
-			rUsers.POST("", controller.CreateUser)      // Protected
-			rUsers.PUT("", controller.UpdateUser)       // Protected
-			rUsers.PUT("/hobbies", controller.AddHobby) // Protected
-
 			// Post
 			rPosts := v1.Group("posts")
 			rPosts.GET("", controller.GetPosts)    // Non-protected
@@ -331,7 +315,9 @@ func SetupRouter(configure *gconfig.Configuration) (*gin.Engine, error) {
 		mapGroup.GET("/info", controller.GetMapInfo)
 
 		// user
-		
+		userGroup := v1.Group("user")
+		userGroup.GET("/info", controller.GetUserInfo)
+
 	}
 
 	return r, nil

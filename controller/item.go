@@ -27,7 +27,7 @@ func GetUserItems(c *gin.Context) {
 
 // SingleSellItems - GET 单个卖，以及多个卖
 func SingleSellItems(c *gin.Context) {
-	uid := strings.TrimSpace(c.PostForm("uid"))
+	uid := strings.TrimSpace(c.Query("uid"))
 	id := strings.TrimSpace(c.Query("item_id"))
 	count := strings.TrimSpace(c.Query("count"))
 
@@ -35,9 +35,9 @@ func SingleSellItems(c *gin.Context) {
 	itemID, _ := strconv.ParseInt(id, 10, 64)
 	itemCount, _ := strconv.ParseInt(count, 10, 64)
 
-	fmt.Println(userID)
 	err := handler.SingleSellItem(userID, itemID, int(itemCount))
 	if err != nil {
+		fmt.Println(err)
 		c.JSON(400, nil)
 	}
 	c.JSON(200, nil)
