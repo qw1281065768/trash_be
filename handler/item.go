@@ -36,6 +36,13 @@ type ItemDetail struct {
 	Price        int    `json:"price"`
 }
 
+type GetUserItemsResp struct {
+	//Code int          `json:"code"`
+	C2array bool         `json:"c2array"`
+	Size    []int        `json:"size"`
+	Data    []ItemDetail `json:"data"`
+}
+
 // GetItemListALL
 func GetItemListALL(userID int64) []ItemDetail {
 	itemList := make([]ItemDetail, 0)
@@ -63,6 +70,39 @@ func GetItemListALL(userID int64) []ItemDetail {
 	}
 
 	return itemList
+}
+
+func GetItemListALL2(userID int64) GetUserItemsResp {
+	resp1 := GetUserItemsResp{
+		C2array: true,
+	}
+	resp1.Size = []int{1, 1, 1}
+	itemList := make([]ItemDetail, 0)
+	resp, err := database.GetUserItemRelaByUserIDALL(userID)
+	if err != nil {
+		fmt.Println(err)
+		return resp1
+	}
+	for _, v := range resp {
+		itemInfo := model.GlobalItemMap[v.ItemID]
+		//itemInfo.OriImgUrl = "4001001"
+		tmpItemInfo := ItemDetail{
+			ID:           itemInfo.ID,
+			Name:         itemInfo.Name,
+			Type:         itemInfo.Type,
+			TypeName:     itemInfo.TypeName,
+			Property:     itemInfo.Property,
+			PropertyName: itemInfo.PropertyName,
+			Description:  itemInfo.Desc,
+			Price:        itemInfo.Price,
+			Count:        v.Count,
+		}
+		itemList = append(itemList, tmpItemInfo)
+		//itemList = append(itemList, itemInfo)
+	}
+
+	resp1.Data = itemList
+	return resp1
 }
 
 func SingleSellItem(userID int64, itemID int64, count int) error {

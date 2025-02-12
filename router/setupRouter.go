@@ -306,8 +306,9 @@ func SetupRouter(configure *gconfig.Configuration) (*gin.Engine, error) {
 
 		// Item
 		itemGroup := v1.Group("item")
-		itemGroup.GET("/user_items", controller.GetUserItems) // 查看用户背包
-		itemGroup.GET("/sell", controller.SingleSellItems)    // 卖掉单个商品
+		itemGroup.GET("/user_items", controller.GetUserItems)   // 查看用户背包
+		itemGroup.GET("/user_items2", controller.GetUserItems2) // 查看用户背包
+		itemGroup.GET("/sell", controller.SingleSellItems)      // 卖掉单个商品
 
 		// Map
 		mapGroup := v1.Group("map")
