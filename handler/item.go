@@ -66,7 +66,8 @@ func GetItemListALL(userID int64) []ItemDetail {
 			Count:        v.Count,
 		}
 		itemList = append(itemList, tmpItemInfo)
-		//itemList = append(itemList, itemInfo)
+		// tmp mock
+		// itemList = append(itemList, tmpItemInfo)
 	}
 
 	return itemList

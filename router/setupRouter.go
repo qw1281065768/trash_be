@@ -306,18 +306,18 @@ func SetupRouter(configure *gconfig.Configuration) (*gin.Engine, error) {
 
 		// Item
 		itemGroup := v1.Group("item")
-		itemGroup.GET("/user_items", controller.GetUserItems)   // 查看用户背包
-		itemGroup.GET("/user_items2", controller.GetUserItems2) // 查看用户背包
+		itemGroup.GET("/user_items", controller.GetUserItems)   // 查看用户背包，结构1
+		itemGroup.GET("/user_items2", controller.GetUserItems2) // 查看用户背包，结构2
 		itemGroup.GET("/sell", controller.SingleSellItems)      // 卖掉单个商品
 
 		// Map
 		mapGroup := v1.Group("map")
-		mapGroup.GET("/user_maps", controller.GetUserMaps)
-		mapGroup.GET("/info", controller.GetMapInfo)
+		mapGroup.GET("/user_maps", controller.GetUserMaps) // 已解锁地图数
+		mapGroup.GET("/info", controller.GetMapInfo)       // 获取地图详情
 
 		// user
 		userGroup := v1.Group("user")
-		userGroup.GET("/info", controller.GetUserInfo)
+		userGroup.GET("/info", controller.GetUserInfo) // 获取用户信息，等级、金币、经验、当前佩戴装备、各个属性
 
 	}
 
